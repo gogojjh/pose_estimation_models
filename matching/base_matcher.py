@@ -50,9 +50,14 @@ class BaseMatcher(torch.nn.Module):
         if isinstance(resize, int):
             resize = (resize, resize)
         img = tfm.ToTensor()(Image.open(path).convert("RGB"))
+        tensor_size1 = img.shape
+
         if resize is not None:
             img = tfm.Resize(resize, antialias=True)(img)
         img = tfm.functional.rotate(img, rot_angle)
+        tensor_size2 = img.shape
+
+        print(f' - adding {path} with resolution {tensor_size1} --> {tensor_size2}')
         return img
 
     def rescale_coords(
