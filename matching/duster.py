@@ -86,6 +86,7 @@ class DusterMatcher(BaseMatcher):
             mode=GlobalAlignerMode.PairViewer,
             verbose=self.verbose,
         )
+        self.scene = scene
 
         # retrieve useful values from scene:
         confidence_masks = scene.get_masks()
@@ -102,6 +103,7 @@ class DusterMatcher(BaseMatcher):
             )  # imgs[i].shape[:2] = (H, W)
             pts3d_list.append(pts3d[i].detach().cpu().numpy()[conf_i])
         reciprocal_in_P2, nn2_in_P1, _ = find_reciprocal_matches(*pts3d_list)
+
         mkpts1 = pts2d_list[1][reciprocal_in_P2]
         mkpts0 = pts2d_list[0][nn2_in_P1][reciprocal_in_P2]
 
@@ -111,21 +113,4 @@ class DusterMatcher(BaseMatcher):
         mkpts0 = self.rescale_coords(mkpts0, *img0_orig_shape, H0, W0)
         mkpts1 = self.rescale_coords(mkpts1, *img1_orig_shape, H1, W1)
 
-        # process_matches is implemented by the parent BaseMatcher, it is the
-        # same for all methods, given the matched keypoints
-        mkpts0, mkpts1 = to_numpy(mkpts0), to_numpy(mkpts1)
-        num_inliers, H, inliers0, inliers1 = self.process_matches(mkpts0, mkpts1)
-        return {
-            "num_inliers": num_inliers,
-            "H": H,
-            "mkpts0": mkpts0,
-            "mkpts1": mkpts1,
-            "inliers0": inliers0,
-            "inliers1": inliers1,
-            "kpts0": None,
-            "kpts1": None,
-            "desc0": None,
-            "desc1": None,
-            "duster_inf_output": output,
-            "duster_scene": scene,
-        }
+        return mkpts0, mkpts1, None, None, None, None
