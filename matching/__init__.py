@@ -19,6 +19,8 @@ available_models = [
     "loftr",
     "eloftr",
     "se2loftr",
+    'aspanformer',
+    'matchformer', 
     "sift-lg",
     "superpoint-lg",
     "disk-lg",
@@ -36,6 +38,7 @@ available_models = [
     "r2d2",
     "d2net",
     "duster",
+    "master",
     "doghardnet-nn",
     "xfeat",
     "xfeat-star",
@@ -74,6 +77,16 @@ def get_matcher(
 
         return se2loftr.Se2LoFTRMatcher(device, *args, **kwargs)
 
+    elif matcher_name == 'aspanformer':
+        from matching import aspanformer
+        
+        return aspanformer.AspanformerMatcher(device, *args, **kwargs)
+    
+    elif matcher_name == 'matchformer':
+        from matching import matchformer
+        
+        return matchformer.MatchformerMatcher(device, *args, **kwargs)
+    
     elif matcher_name == "sift-lg":
         from matching import lightglue
 
@@ -154,10 +167,15 @@ def get_matcher(
 
         return matching_toolbox.D2netMatcher(device, *args, **kwargs)
 
-    elif matcher_name == "duster":
+    elif matcher_name in ["duster", "dust3r"]:
         from matching import duster
 
-        return duster.DusterMatcher(device, max_num_keypoints, *args, **kwargs)
+        return duster.Dust3rMatcher(device, max_num_keypoints, *args, **kwargs)
+
+    elif matcher_name in ["master", "mast3r"]:
+        from matching import master
+
+        return master.Mast3rMatcher(device, max_num_keypoints, *args, **kwargs)
 
     elif matcher_name == "doghardnet-nn":
         from matching import matching_toolbox
