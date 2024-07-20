@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torchvision.transforms as tfm
 import os, contextlib
+from typing import Union
 
 logger = logging.getLogger()
 logger.setLevel(31)  # Avoid printing useless low-level logs
@@ -33,12 +34,11 @@ def get_image_pairs_paths(inputs):
                 raise RuntimeError(f"{pair} should be a pair of paths")
     return pairs_of_paths
 
-
-def to_numpy(x: torch.Tensor | np.ndarray | dict | list) -> np.ndarray:
+def to_numpy(x: Union[torch.Tensor, np.ndarray, dict, list]) -> np.ndarray:
     """convert item or container of items to numpy
 
     Args:
-        x (torch.Tensor | np.ndarray | dict | list): input
+        x (Union[torch.Tensor, np.ndarray, dict, list]): input
 
     Returns:
         np.ndarray: numpy array of input
@@ -48,23 +48,23 @@ def to_numpy(x: torch.Tensor | np.ndarray | dict | list) -> np.ndarray:
     if isinstance(x, dict):
         for k, v in x.items():
             x[k] = to_numpy(v)
+        return x
     if isinstance(x, torch.Tensor):
         return x.cpu().numpy()
     if isinstance(x, np.ndarray):
         return x
 
-
-def to_normalized_coords(pts: np.ndarray | torch.Tensor, height: int, width: int):
+def to_normalized_coords(pts: Union[np.ndarray, torch.Tensor], height: int, width: int) -> np.ndarray:
     """normalize kpt coords from px space to [0,1]
     Assumes pts are in x, y order in array/tensor shape (N, 2)
 
     Args:
-        pts (np.ndarray | torch.Tensor): array of kpts, must be shape (N, 2)
+        pts (Union[np.ndarray, torch.Tensor]): array of kpts, must be shape (N, 2)
         height (int): height of img
         width (int): width of img
 
     Returns:
-        np.array: kpts in normalized [0,1] coords
+        np.ndarray: kpts in normalized [0,1] coords
     """
     # normalize kpt coords from px space to [0,1]
     # assume pts are in x,y order
@@ -77,18 +77,17 @@ def to_normalized_coords(pts: np.ndarray | torch.Tensor, height: int, width: int
 
     return pts
 
-
-def to_px_coords(pts: np.ndarray | torch.Tensor, height: int, width: int) -> np.ndarray:
+def to_px_coords(pts: Union[np.ndarray, torch.Tensor], height: int, width: int) -> np.ndarray:
     """unnormalized kpt coords from [0,1] to px space
     Assumes pts are in x, y order
 
     Args:
-        pts (np.ndarray | torch.Tensor): array of kpts, must be shape (N, 2)
+        pts (Union[np.ndarray, torch.Tensor]): array of kpts, must be shape (N, 2)
         height (int): height of img
         width (int): width of img
 
     Returns:
-        np.array: kpts in normalized [0,1] coords
+        np.ndarray: kpts in normalized [0,1] coords
     """
     assert (
         pts.shape[-1] == 2
@@ -98,7 +97,6 @@ def to_px_coords(pts: np.ndarray | torch.Tensor, height: int, width: int) -> np.
     pts[:, 1] *= height
 
     return pts
-
 
 def resize_to_divisible(img: torch.Tensor, divisible_by: int = 14) -> torch.Tensor:
     """Resize to be divisible by a factor. Useful for ViT based models.
