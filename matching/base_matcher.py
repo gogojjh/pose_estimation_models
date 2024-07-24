@@ -12,15 +12,25 @@ from matching import get_matcher
 from matching.utils import to_normalized_coords, to_px_coords, to_numpy
 
 
+from typing import Union, Tuple
+from pathlib import Path
+import warnings
+import torch
+import torch.nn as nn
+import torchvision.transforms as tfm
+from PIL import Image
+import numpy as np
+import cv2
+
 class BaseMatcher(torch.nn.Module):
     """
     This serves as a base class for all matchers. It provides a simple interface
     for its sub-classes to implement, namely each matcher must specify its own
     __init__ and _forward methods. It also provides a common image_loader and
-    homography estimator
+    homography estimator.
     """
 
-    # OpenCV default ransac params
+    # OpenCV default Ransac params
     DEFAULT_RANSAC_ITERS = 2000
     DEFAULT_RANSAC_CONF = 0.95
     DEFAULT_REPROJ_THRESH = 3
@@ -36,7 +46,7 @@ class BaseMatcher(torch.nn.Module):
         )
 
     @staticmethod
-    def image_loader(path: str | Path, resize: int | Tuple, rot_angle: float = 0):
+    def image_loader(path: Union[str, Path], resize: Union[int, Tuple] = None, rot_angle: float = 0):
         warnings.warn(
             "`image_loader` is replaced by `load_image` and will be removed in a future release.",
             DeprecationWarning,
@@ -45,7 +55,7 @@ class BaseMatcher(torch.nn.Module):
 
     @staticmethod
     def load_image(
-        path: str | Path, resize: int | Tuple = None, rot_angle: float = 0
+        path: Union[str, Path], resize: Union[int, Tuple] = None, rot_angle: float = 0
     ) -> torch.Tensor:
         if isinstance(resize, int):
             resize = (resize, resize)
@@ -62,7 +72,7 @@ class BaseMatcher(torch.nn.Module):
 
     def rescale_coords(
         self,
-        pts: np.ndarray | torch.Tensor,
+        pts: Union[np.ndarray, torch.Tensor],
         h_orig: int,
         w_orig: int,
         h_new: int,
@@ -84,8 +94,8 @@ class BaseMatcher(torch.nn.Module):
 
     @staticmethod
     def find_homography(
-        points1: np.ndarray | torch.Tensor,
-        points2: np.ndarray | torch.Tensor,
+        points1: Union[np.ndarray, torch.Tensor],
+        points2: Union[np.ndarray, torch.Tensor],
         reproj_thresh: int = DEFAULT_REPROJ_THRESH,
         num_iters: int = DEFAULT_RANSAC_ITERS,
         ransac_conf: float = DEFAULT_RANSAC_CONF,
@@ -120,9 +130,9 @@ class BaseMatcher(torch.nn.Module):
 
     def preprocess(self, img: torch.Tensor) -> torch.Tensor:
         """Image preprocessing for each matcher. Some matchers require grayscale, normalization, etc.
-        Applied to each input img independently
+        Applied to each input img independently.
 
-        Default preprocessing is none
+        Default preprocessing is none.
 
         Args:
             img (torch.Tensor): input image (before preprocessing)
@@ -133,7 +143,7 @@ class BaseMatcher(torch.nn.Module):
         return img
 
     @torch.inference_mode()
-    def forward(self, img0: torch.Tensor | str | Path, img1: torch.Tensor | str | Path) -> dict:
+    def forward(self, img0: Union[torch.Tensor, str, Path], img1: Union[torch.Tensor, str, Path]) -> dict:
         """
         All sub-classes implement the following interface:
 
