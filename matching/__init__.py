@@ -19,8 +19,8 @@ available_models = [
     "loftr",
     "eloftr",
     "se2loftr",
-    'aspanformer',
-    'matchformer', 
+    "aspanformer",
+    "matchformer",
     "sift-lg",
     "superpoint-lg",
     "disk-lg",
@@ -46,6 +46,7 @@ available_models = [
     "gim-dkm",
     "gim-lg",
     "omniglue",
+    "mickey",
 ]
 
 
@@ -53,6 +54,7 @@ def get_version(pkg):
     version_num = pkg.__version__.split("-")[0]
     major, minor, patch = [int(num) for num in version_num.split(".")]
     return major, minor, patch
+
 
 @supress_stdout
 def get_matcher(
@@ -77,16 +79,16 @@ def get_matcher(
 
         return se2loftr.Se2LoFTRMatcher(device, *args, **kwargs)
 
-    elif matcher_name == 'aspanformer':
+    elif matcher_name == "aspanformer":
         from matching import aspanformer
-        
+
         return aspanformer.AspanformerMatcher(device, *args, **kwargs)
-    
-    elif matcher_name == 'matchformer':
+
+    elif matcher_name == "matchformer":
         from matching import matchformer
-        
+
         return matchformer.MatchformerMatcher(device, *args, **kwargs)
-    
+
     elif matcher_name == "sift-lg":
         from matching import lightglue
 
@@ -212,6 +214,11 @@ def get_matcher(
         from matching import omniglue
 
         return omniglue.OmniglueMatcher(device, *args, **kwargs)
+
+    elif matcher_name == "mickey":
+        from matching import mickey
+
+        return mickey.MickeyMatcher(device, *args, **kwargs)
     else:
         raise RuntimeError(
             f"Matcher {matcher_name} not yet supported. Consider submitted a PR to add it. Available models: {available_models}"

@@ -22,6 +22,7 @@ from PIL import Image
 import numpy as np
 import cv2
 
+
 class BaseMatcher(torch.nn.Module):
     """
     This serves as a base class for all matchers. It provides a simple interface
@@ -46,7 +47,9 @@ class BaseMatcher(torch.nn.Module):
         )
 
     @staticmethod
-    def image_loader(path: Union[str, Path], resize: Union[int, Tuple] = None, rot_angle: float = 0):
+    def image_loader(
+        path: Union[str, Path], resize: Union[int, Tuple] = None, rot_angle: float = 0
+    ):
         warnings.warn(
             "`image_loader` is replaced by `load_image` and will be removed in a future release.",
             DeprecationWarning,
@@ -63,11 +66,11 @@ class BaseMatcher(torch.nn.Module):
         tensor_size1 = img.shape
 
         if resize is not None:
-            img = tfm.Resize(resize, antialias=True)(img)
+            img = tfm.Resize(resize, antialias=False)(img)
         img = tfm.functional.rotate(img, rot_angle)
         tensor_size2 = img.shape
 
-        print(f' - adding {path} with resolution {tensor_size1} --> {tensor_size2}')
+        print(f" - adding {path} with resolution {tensor_size1} --> {tensor_size2}")
         return img
 
     def rescale_coords(
@@ -143,7 +146,9 @@ class BaseMatcher(torch.nn.Module):
         return img
 
     @torch.inference_mode()
-    def forward(self, img0: Union[torch.Tensor, str, Path], img1: Union[torch.Tensor, str, Path]) -> dict:
+    def forward(
+        self, img0: Union[torch.Tensor, str, Path], img1: Union[torch.Tensor, str, Path]
+    ) -> dict:
         """
         All sub-classes implement the following interface:
 
@@ -180,7 +185,9 @@ class BaseMatcher(torch.nn.Module):
         img1 = img1.to(self.device)
 
         # self._forward() is implemented by the children modules
-        mkpts0, mkpts1, keypoints0, keypoints1, descriptors0, descriptors1 = self._forward(img0, img1)
+        mkpts0, mkpts1, keypoints0, keypoints1, descriptors0, descriptors1 = (
+            self._forward(img0, img1)
+        )
 
         mkpts0, mkpts1 = to_numpy(mkpts0), to_numpy(mkpts1)
         num_inliers, H, inliers0, inliers1 = self.process_matches(mkpts0, mkpts1)
