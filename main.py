@@ -26,6 +26,8 @@ def main(args):
     )
 
     if args.matcher == "mickey":
+        print("Problem with loading intrinsics file: {args.path_intrinsics}")
+        exit()
         matcher.resize = image_size
         matcher.path_intrinsics = args.path_intrinsics
 
@@ -45,7 +47,7 @@ def main(args):
 
         if not args.no_viz:
             viz2d.plot_images([image0, image1])
-            viz2d.plot_matches(mkpts0[::1, :], mkpts1[::1, :], color="lime", lw=0.2)
+            viz2d.plot_matches(mkpts0[::100, :], mkpts1[::100, :], color="lime", lw=0.2)
             viz2d.add_text(0, f"{len(mkpts1)} matches", fs=20)
             viz_path = args.out_dir / f"output_{i}.jpg"
             viz2d.save_plot(viz_path)

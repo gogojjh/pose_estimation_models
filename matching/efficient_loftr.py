@@ -7,9 +7,7 @@ import sys
 from copy import deepcopy
 import torchvision.transforms as tfm
 
-sys.path.append(
-    str(Path(__file__).parent.parent.joinpath("third_party/EfficientLoFTR"))
-)
+sys.path.append(str(Path(__file__).parent.parent / "third_party/EfficientLoFTR"))
 
 from src.loftr import LoFTR, full_default_cfg, opt_default_cfg, reparameter
 from matching import WEIGHTS_DIR

@@ -63,7 +63,10 @@ class Dust3rMatcher(BaseMatcher):
             pairs, self.model, self.device, batch_size=1, verbose=self.verbose
         )
 
-        '''
+        # view1, pred1 = output['view1'], output['pred1']
+        # view2, pred2 = output['view2'], output['pred2']
+
+        """
         # at this stage, you have the raw dust3r predictions
         view1, pred1 = output['view1'], output['pred1']
         view2, pred2 = output['view2'], output['pred2']
@@ -78,7 +81,7 @@ class Dust3rMatcher(BaseMatcher):
         # pred1 and pred2 contains the confidence values: pred1['conf'] and pred2['conf']
         # pred1 contains 3D points for view1['img'] in view1['img'] space: pred1['pts3d']
         # pred2 contains 3D points for view2['img'] in view1['img'] space: pred2['pts3d_in_other_view']
-        '''
+        """
 
         scene = global_aligner(
             output,
