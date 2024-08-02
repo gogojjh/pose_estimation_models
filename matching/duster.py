@@ -56,12 +56,8 @@ class Dust3rMatcher(BaseMatcher):
             {"img": img0, "idx": 0, "instance": 0},
             {"img": img1, "idx": 1, "instance": 1},
         ]
-        pairs = make_pairs(
-            images, scene_graph="complete", prefilter=None, symmetrize=True
-        )
-        output = inference(
-            pairs, self.model, self.device, batch_size=1, verbose=self.verbose
-        )
+        pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
+        output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
 
         # view1, pred1 = output['view1'], output['pred1']
         # view2, pred2 = output['view2'], output['pred2']
@@ -101,9 +97,7 @@ class Dust3rMatcher(BaseMatcher):
         pts2d_list, pts3d_list = [], []
         for i in range(2):
             conf_i = confidence_masks[i].cpu().numpy()
-            pts2d_list.append(
-                xy_grid(*imgs[i].shape[:2][::-1])[conf_i]
-            )  # imgs[i].shape[:2] = (H, W)
+            pts2d_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
             pts3d_list.append(pts3d[i].detach().cpu().numpy()[conf_i])
         reciprocal_in_P2, nn2_in_P1, _ = find_reciprocal_matches(*pts3d_list)
 

@@ -23,10 +23,7 @@ def get_image_pairs_paths(inputs):
         for pair in pairs_of_paths:
             if len(pair) != 2:
                 raise RuntimeError(f"{pair} should be a pair of paths")
-        pairs_of_paths = [
-            (Path(path0.strip()), Path(path1.strip()))
-            for path0, path1 in pairs_of_paths
-        ]
+        pairs_of_paths = [(Path(path0.strip()), Path(path1.strip())) for path0, path1 in pairs_of_paths]
     else:
         pair_dirs = sorted(Path(inputs).glob("*"))
         pairs_of_paths = [list(pair_dir.glob("*")) for pair_dir in pair_dirs]
@@ -55,6 +52,25 @@ def to_numpy(x: Union[torch.Tensor, np.ndarray, dict, list]) -> np.ndarray:
     if isinstance(x, np.ndarray):
         return x
 
+def to_tensor(x: np.ndarray | torch.Tensor, device: str = None) -> torch.Tensor:
+    """Convert to tensor and place on device
+
+    Args:
+        x (np.ndarray | torch.Tensor): item to convert to tensor
+        device (str, optional): device to place tensor on. Defaults to None.
+
+    Returns:
+        torch.Tensor: tensor with data from `x` on device `device`
+    """
+    if isinstance(x, torch.Tensor):
+        pass
+    elif isinstance(x, np.ndarray):
+        x = torch.from_numpy(x)
+
+    if device is not None:
+        return x.to(device)
+
+
 def to_normalized_coords(pts: Union[np.ndarray, torch.Tensor], height: int, width: int) -> np.ndarray:
     """normalize kpt coords from px space to [0,1]
     Assumes pts are in x, y order in array/tensor shape (N, 2)
@@ -69,9 +85,7 @@ def to_normalized_coords(pts: Union[np.ndarray, torch.Tensor], height: int, widt
     """
     # normalize kpt coords from px space to [0,1]
     # assume pts are in x,y order
-    assert (
-        pts.shape[-1] == 2
-    ), f"input to `to_normalized_coords` should be shape (N, 2), input is shape {pts.shape}"
+    assert pts.shape[-1] == 2, f"input to `to_normalized_coords` should be shape (N, 2), input is shape {pts.shape}"
     pts = to_numpy(pts).astype(float)
     pts[:, 0] /= width
     pts[:, 1] /= height
@@ -90,9 +104,7 @@ def to_px_coords(pts: Union[np.ndarray, torch.Tensor], height: int, width: int) 
     Returns:
         np.ndarray: kpts in normalized [0,1] coords
     """
-    assert (
-        pts.shape[-1] == 2
-    ), f"input to `to_px_coords` should be shape (N, 2), input is shape {pts.shape}"
+    assert pts.shape[-1] == 2, f"input to `to_px_coords` should be shape (N, 2), input is shape {pts.shape}"
     pts = to_numpy(pts)
     pts[:, 0] *= width
     pts[:, 1] *= height
@@ -117,12 +129,15 @@ def resize_to_divisible(img: torch.Tensor, divisible_by: int = 14) -> torch.Tens
 
     return img
 
+
 def supress_stdout(func):
     def wrapper(*a, **ka):
-        with open(os.devnull, 'w') as devnull:
+        with open(os.devnull, "w") as devnull:
             with contextlib.redirect_stdout(devnull):
                 return func(*a, **ka)
+
     return wrapper
+
 
 def lower_config(yacs_cfg):
     if not isinstance(yacs_cfg, CN):

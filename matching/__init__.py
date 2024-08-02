@@ -42,11 +42,17 @@ available_models = [
     "doghardnet-nn",
     "xfeat",
     "xfeat-star",
+    "xfeat-lg",
     "dedode-lg",
     "gim-dkm",
     "gim-lg",
     "omniglue",
     "mickey",
+    "xfeat-subpx",
+    "xfeat-lg-subpx",
+    "dedode-subpx",
+    # "splg-subpx",
+    "aliked-subpx",
 ]
 
 
@@ -57,13 +63,18 @@ def get_version(pkg):
 
 
 @supress_stdout
-def get_matcher(
-    matcher_name="sift-lg", device="cpu", max_num_keypoints=2048, *args, **kwargs
-):
+def get_matcher(matcher_name="sift-lg", device="cpu", max_num_keypoints=2048, *args, **kwargs):
     if isinstance(matcher_name, list):
         from matching.base_matcher import EnsembleMatcher
 
         return EnsembleMatcher(matcher_name, device, *args, **kwargs)
+    if "subpx" in matcher_name:
+        from matching import keypt2subpx
+
+        detector_name = matcher_name.removesuffix("-subpx")
+
+        return keypt2subpx.Keypt2SubpxMatcher(device, detector_name=detector_name, *args, **kwargs)
+
     if matcher_name == "loftr":
         from matching import loftr
 
@@ -155,9 +166,7 @@ def get_matcher(
     elif matcher_name == "superglue":
         from matching import matching_toolbox
 
-        return matching_toolbox.SuperGlueMatcher(
-            device, max_num_keypoints, *args, **kwargs
-        )
+        return matching_toolbox.SuperGlueMatcher(device, max_num_keypoints, *args, **kwargs)
 
     elif matcher_name == "r2d2":
         from matching import matching_toolbox
@@ -182,13 +191,16 @@ def get_matcher(
     elif matcher_name == "doghardnet-nn":
         from matching import matching_toolbox
 
-        return matching_toolbox.DogAffHardNNMatcher(device, *args, **kwargs)
+        return matching_toolbox.DogAffHardNNMatcher(device, max_num_keypoints=max_num_keypoints, *args, **kwargs)
 
     elif "xfeat" in matcher_name:
         from matching import xfeat
 
         kwargs["mode"] = "semi-dense" if "star" in matcher_name else "sparse"
-        return xfeat.xFeatMatcher(device, *args, **kwargs)
+
+        if matcher_name.removeprefix("xfeat").removeprefix("-") in ["lg", "lightglue", "lighterglue"]:
+            kwargs["mode"] = "lighterglue"
+        return xfeat.xFeatMatcher(device, max_num_keypoints=max_num_keypoints, *args, **kwargs)
 
     elif matcher_name == "dedode-lg":
         from matching import kornia

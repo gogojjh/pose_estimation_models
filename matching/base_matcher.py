@@ -3,7 +3,6 @@ import torch
 import numpy as np
 from PIL import Image
 import torchvision.transforms as tfm
-from copy import deepcopy
 import warnings
 from pathlib import Path
 from typing import Tuple
@@ -42,9 +41,7 @@ class BaseMatcher(torch.nn.Module):
 
         self.ransac_iters = kwargs.get("ransac_iters", BaseMatcher.DEFAULT_RANSAC_ITERS)
         self.ransac_conf = kwargs.get("ransac_conf", BaseMatcher.DEFAULT_RANSAC_CONF)
-        self.ransac_reproj_thresh = kwargs.get(
-            "ransac_reproj_thresh", BaseMatcher.DEFAULT_REPROJ_THRESH
-        )
+        self.ransac_reproj_thresh = kwargs.get("ransac_reproj_thresh", BaseMatcher.DEFAULT_REPROJ_THRESH)
 
     @staticmethod
     def image_loader(
@@ -107,9 +104,7 @@ class BaseMatcher(torch.nn.Module):
         assert points1.shape[1] == 2
         points1, points2 = to_numpy(points1), to_numpy(points2)
 
-        H, inliers_mask = cv2.findHomography(
-            points1, points2, cv2.USAC_MAGSAC, reproj_thresh, ransac_conf, num_iters
-        )
+        H, inliers_mask = cv2.findHomography(points1, points2, cv2.USAC_MAGSAC, reproj_thresh, ransac_conf, num_iters)
         assert inliers_mask.shape[1] == 1
         inliers_mask = inliers_mask[:, 0]
         return H, inliers_mask.astype(bool)
@@ -210,9 +205,7 @@ class EnsembleMatcher(BaseMatcher):
     def __init__(self, matcher_names=[], device="cpu", **kwargs):
         super().__init__(device, **kwargs)
 
-        self.matchers = [
-            get_matcher(name, device=device, **kwargs) for name in matcher_names
-        ]
+        self.matchers = [get_matcher(name, device=device, **kwargs) for name in matcher_names]
 
     def _forward(self, img0, img1):
         all_mkpts0, all_mkpts1 = [], []
