@@ -4,6 +4,7 @@ import os
 import torchvision.transforms as tfm
 import py3_wget
 import numpy as np
+import time
 
 sys.path.append(str(Path(__file__).parent.parent.joinpath("third_party/mast3r")))
 
@@ -25,6 +26,8 @@ class Mast3rMatcher(BaseMatcher):
     def __init__(self, device="cpu", *args, **kwargs):
         super().__init__(device, **kwargs)
         self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+        self.min_conf_thr = 1.5
 
         self.verbose = False
 
@@ -58,12 +61,20 @@ class Mast3rMatcher(BaseMatcher):
             {"img": img0, "idx": 0, "instance": 0, "true_shape": np.int32([img0.shape[-2:]])},
             {"img": img1, "idx": 1, "instance": 1, "true_shape": np.int32([img1.shape[-2:]])},
         ]
+
         output = inference([tuple(img_pair)], self.model, self.device, batch_size=1, verbose=False)
+
         # at this stage, you have the raw dust3r predictions
         view1, pred1 = output["view1"], output["pred1"]
         view2, pred2 = output["view2"], output["pred2"]
 
         desc1, desc2 = pred1["desc"].squeeze(0).detach(), pred2["desc"].squeeze(0).detach()
+
+        """
+        output keys: ['view1', 'view2', 'pred1', 'pred2', 'loss'])
+        view keys: ['img', 'idx', 'instance', 'true_shape'])
+        pred keys: ['pts3d', 'conf', 'desc', 'desc_conf'])
+        """
 
         # find 2D-2D matches between the two images
         matches_im0, matches_im1 = fast_reciprocal_NNs(
@@ -89,10 +100,19 @@ class Mast3rMatcher(BaseMatcher):
 
         valid_matches = valid_matches_im0 & valid_matches_im1
         mkpts0, mkpts1 = matches_im0[valid_matches], matches_im1[valid_matches]
+
+        # filter out matches with low confidence
+        conf1 = pred1["conf"].squeeze(0).detach()
+        conf2 = pred2["conf"].squeeze(0).detach()
+        mask_high_conf = (conf1[mkpts0[:, 1].astype(np.int32), mkpts0[:, 0].astype(np.int32)] > self.min_conf_thr) & \
+                         (conf2[mkpts1[:, 1].astype(np.int32), mkpts1[:, 0].astype(np.int32)] > self.min_conf_thr)
+        mkpts0 = mkpts0[mask_high_conf]
+        mkpts1 = mkpts1[mask_high_conf]
+
         # duster sometimes requires reshaping an image to fit vit patch size evenly, so we need to
         # rescale kpts to the original img
         H0, W0, H1, W1 = *img0.shape[-2:], *img1.shape[-2:]
         mkpts0 = self.rescale_coords(mkpts0, *img0_orig_shape, H0, W0)
         mkpts1 = self.rescale_coords(mkpts1, *img1_orig_shape, H1, W1)
-
+        
         return mkpts0, mkpts1, None, None, None, None

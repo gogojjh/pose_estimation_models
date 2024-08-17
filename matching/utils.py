@@ -52,7 +52,7 @@ def to_numpy(x: Union[torch.Tensor, np.ndarray, dict, list]) -> np.ndarray:
     if isinstance(x, np.ndarray):
         return x
 
-def to_tensor(x: np.ndarray | torch.Tensor, device: str = None) -> torch.Tensor:
+def to_tensor(x: Union[np.ndarray, torch.Tensor], device: str = None) -> torch.Tensor:
     """Convert to tensor and place on device
 
     Args:
