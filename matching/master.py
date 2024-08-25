@@ -14,7 +14,7 @@ from mast3r.fast_nn import fast_reciprocal_NNs
 from dust3r.inference import inference
 
 from matching.base_matcher import BaseMatcher
-from matching.utils import to_numpy, resize_to_divisible
+from matching.utils import resize_to_divisible
 
 from matching import WEIGHTS_DIR
 
