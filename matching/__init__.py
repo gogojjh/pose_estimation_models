@@ -51,7 +51,7 @@ available_models = [
     "xfeat-subpx",
     "xfeat-lg-subpx",
     "dedode-subpx",
-    # "splg-subpx",
+    "splg-subpx",
     "aliked-subpx",
 ]
 

@@ -43,3 +43,6 @@
 [submodule "third_party/mickey"]
 	path = third_party/mickey
 	url = https://github.com/nianticlabs/mickey
+[submodule "third_party/keypt2subpx"]
+	path = third_party/keypt2subpx
+	url = https://github.com/KimSinjeong/keypt2subpx.git
