@@ -26,13 +26,14 @@ class Mast3rMatcher(BaseMatcher):
     def __init__(self, device="cpu", *args, **kwargs):
         super().__init__(device, **kwargs)
         self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-
+        # NOTE(gogojjh): This is the threshold for the confidence of the matches, higher is better, but less matcher
+        # indoor - matterport3d
         self.min_conf_thr = 1.5
+        # outdoor - anymal
+        # self.min_conf_thr = 0.9
 
         self.verbose = False
-
         self.download_weights()
-
         self.model = AsymmetricMASt3R.from_pretrained(self.model_path).to(device)
 
     @staticmethod

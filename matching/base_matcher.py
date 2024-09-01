@@ -188,6 +188,7 @@ class BaseMatcher(torch.nn.Module):
         num_inliers, H, inliers0, inliers1 = self.process_matches(mkpts0, mkpts1)
 
         return {
+            "num_inliers_kpts": mkpts0.shape[0],
             "num_inliers": num_inliers,
             "H": H,
             "mkpts0": mkpts0,
