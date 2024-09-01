@@ -145,7 +145,7 @@ def lower_config(yacs_cfg):
         return yacs_cfg
     return {k.lower(): lower_config(v) for k, v in yacs_cfg.items()}
 
-def load_module(module_name: str, module_path: Path | str) -> None:
+def load_module(module_name: str, module_path: Union[Path, str]) -> None:
     """Load module from `module_path` into the interpreter with the namespace given by module_name.
     
     Note that `module_path` is usually the path to an `__init__.py` file.
