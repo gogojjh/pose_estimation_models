@@ -28,7 +28,9 @@ class Mast3rMatcher(BaseMatcher):
         self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         # NOTE(gogojjh): This is the threshold for the confidence of the matches, higher is better, but less matcher
         # indoor - matterport3d
-        self.min_conf_thr = 1.5
+        # self.min_conf_thr = 1.5
+        # indoor - anymal
+        self.min_conf_thr = 1.2
         # outdoor - anymal
         # self.min_conf_thr = 0.9
 
@@ -102,6 +104,7 @@ class Mast3rMatcher(BaseMatcher):
         valid_matches = valid_matches_im0 & valid_matches_im1
         mkpts0, mkpts1 = matches_im0[valid_matches], matches_im1[valid_matches]
 
+        # NOTE(gogojjh):
         # filter out matches with low confidence
         conf1 = pred1["conf"].squeeze(0).detach()
         conf2 = pred2["conf"].squeeze(0).detach()
