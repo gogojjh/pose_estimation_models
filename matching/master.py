@@ -26,14 +26,7 @@ class Mast3rMatcher(BaseMatcher):
     def __init__(self, device="cpu", *args, **kwargs):
         super().__init__(device, **kwargs)
         self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        # NOTE(gogojjh): This is the threshold for the confidence of the matches, higher is better, but less matcher
-        # indoor - matterport3d
-        # self.min_conf_thr = 1.5
-        # indoor - anymal
-        self.min_conf_thr = 1.2
-        # outdoor - anymal
-        # self.min_conf_thr = 0.9
-
+        self.min_conf_thr = 0.0
         self.verbose = False
         self.download_weights()
         self.model = AsymmetricMASt3R.from_pretrained(self.model_path).to(device)
@@ -104,6 +97,7 @@ class Mast3rMatcher(BaseMatcher):
         valid_matches = valid_matches_im0 & valid_matches_im1
         mkpts0, mkpts1 = matches_im0[valid_matches], matches_im1[valid_matches]
 
+        ##################################################
         # NOTE(gogojjh):
         # filter out matches with low confidence
         conf1 = pred1["conf"].squeeze(0).detach()
@@ -112,6 +106,7 @@ class Mast3rMatcher(BaseMatcher):
                          (conf2[mkpts1[:, 1].astype(np.int32), mkpts1[:, 0].astype(np.int32)] > self.min_conf_thr)
         mkpts0 = mkpts0[mask_high_conf]
         mkpts1 = mkpts1[mask_high_conf]
+        ##################################################
 
         # duster sometimes requires reshaping an image to fit vit patch size evenly, so we need to
         # rescale kpts to the original img
