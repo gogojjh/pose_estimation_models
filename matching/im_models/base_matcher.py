@@ -6,7 +6,7 @@ import torchvision.transforms as tfm
 import warnings
 from pathlib import Path
 from typing import Tuple
-import Union
+from typing import Union
 
 from matching.utils import to_normalized_coords, to_px_coords, to_numpy
 

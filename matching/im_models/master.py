@@ -2,7 +2,6 @@ import os
 import torchvision.transforms as tfm
 import py3_wget
 import numpy as np
-import time
 
 from matching import BaseMatcher, WEIGHTS_DIR, THIRD_PARTY_DIR
 from matching.utils import resize_to_divisible, add_to_path
@@ -55,14 +54,13 @@ class Mast3rMatcher(BaseMatcher):
         ]
 
         output = inference([tuple(img_pair)], self.model, self.device, batch_size=1, verbose=False)
-
         # at this stage, you have the raw dust3r predictions
         view1, pred1 = output["view1"], output["pred1"]
         view2, pred2 = output["view2"], output["pred2"]
 
         desc1, desc2 = pred1["desc"].squeeze(0).detach(), pred2["desc"].squeeze(0).detach()
 
-        """
+        """NOTE(gogojjh): 
         output keys: ['view1', 'view2', 'pred1', 'pred2', 'loss'])
         view keys: ['img', 'idx', 'instance', 'true_shape'])
         pred keys: ['pts3d', 'conf', 'desc', 'desc_conf'])
