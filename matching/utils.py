@@ -147,7 +147,7 @@ def lower_config(yacs_cfg):
 
 def load_module(module_name: str, module_path: Union[Path, str]) -> None:
     """Load module from `module_path` into the interpreter with the namespace given by module_name.
-    
+
     Note that `module_path` is usually the path to an `__init__.py` file.
 
     Args:
@@ -155,9 +155,20 @@ def load_module(module_name: str, module_path: Union[Path, str]) -> None:
         module_path (Path | str): path to module (usually an __init__.py file)
     """
     import importlib
+
     # load gluefactory into namespace
     # module_name = 'gluefactory'
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
+
+
+def add_to_path(path: str | Path, insert=None) -> None:
+    path = str(path)
+    if path in sys.path:
+        sys.path.remove(path)
+    if insert is None:
+        sys.path.append(path)
+    else:
+        sys.path.insert(insert, path)
