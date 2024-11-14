@@ -25,9 +25,8 @@ def main(args):
     estimator = get_estimator(args.model, device=args.device)
 
     # Load images
-    list_img0_path = ['/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/seq0/frame_00000.jpg',
-                      '/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/seq1/frame_00000.jpg']
-    img1_path = '/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/seq1/frame_00001.jpg'
+    list_img0_path = ['assets/example_master/frame_00001.jpg', 'assets/example_master/frame_00002.jpg']
+    img1_path = 'assets/example_master/frame_00000.jpg'
     for i in range(1):
         list_img0 = [estimator.load_image(img0_path, resize=image_size) for img0_path in list_img0_path]
         img1 = estimator.load_image(img1_path, resize=image_size)
@@ -61,12 +60,12 @@ def parse_args():
     parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
     parser.add_argument("--no_viz", action="store_true", help="avoid saving visualizations")
 
-    parser.add_argument(
-        "--input",
-        type=str,
-        default="assets/example_pairs",
-        help="path to either (1) dir with dirs with image pairs or (2) txt file with two image paths per line",
-    )
+    # parser.add_argument(
+    #     "--input",
+    #     type=str,
+    #     default="assets/example_pairs",
+    #     help="path to either (1) dir with dirs with image pairs or (2) txt file with two image paths per line",
+    # )
     parser.add_argument("--out_dir", type=Path, default=None, help="path where outputs are saved")
 
     args = parser.parse_args()
