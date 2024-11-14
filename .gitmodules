@@ -1,48 +1,48 @@
-[submodule "matching/third_party/LightGlue"]
-	path = matching/third_party/LightGlue
+[submodule "estimator/third_party/LightGlue"]
+	path = estimator/third_party/LightGlue
 	url = https://github.com/cvg/LightGlue.git
-[submodule "matching/third_party/RoMa"]
-	path = matching/third_party/RoMa
+[submodule "estimator/third_party/RoMa"]
+	path = estimator/third_party/RoMa
 	url = https://github.com/Parskatt/RoMa
-[submodule "matching/third_party/DeDoDe"]
-	path = matching/third_party/DeDoDe
+[submodule "estimator/third_party/DeDoDe"]
+	path = estimator/third_party/DeDoDe
 	url = https://github.com/Parskatt/DeDoDe
-[submodule "matching/third_party/imatch-toolbox"]
-	path = matching/third_party/imatch-toolbox
+[submodule "estimator/third_party/imatch-toolbox"]
+	path = estimator/third_party/imatch-toolbox
 	url = https://github.com/ga1i13o/image-matching-toolbox
-[submodule "matching/third_party/duster"]
-	path = matching/third_party/duster
+[submodule "estimator/third_party/duster"]
+	path = estimator/third_party/duster
 	url = https://github.com/naver/dust3r
-[submodule "matching/third_party/Steerers"]
-	path = matching/third_party/Steerers
+[submodule "estimator/third_party/Steerers"]
+	path = estimator/third_party/Steerers
 	url = https://github.com/georg-bn/rotation-steerers.git
-[submodule "matching/third_party/accelerated_features"]
-	path = matching/third_party/accelerated_features
+[submodule "estimator/third_party/accelerated_features"]
+	path = estimator/third_party/accelerated_features
 	url = https://github.com/verlab/accelerated_features.git
-[submodule "matching/third_party/omniglue"]
-	path = matching/third_party/omniglue
+[submodule "estimator/third_party/omniglue"]
+	path = estimator/third_party/omniglue
 	url = https://github.com/google-research/omniglue.git
-[submodule "matching/third_party/gim"]
-	path = matching/third_party/gim
+[submodule "estimator/third_party/gim"]
+	path = estimator/third_party/gim
 	url = https://github.com/alexstoken/gim.git
-[submodule "matching/third_party/EfficientLoFTR"]
-	path = matching/third_party/EfficientLoFTR
+[submodule "estimator/third_party/EfficientLoFTR"]
+	path = estimator/third_party/EfficientLoFTR
 	url = https://github.com/zju3dv/EfficientLoFTR
-[submodule "matching/third_party/Se2_LoFTR"]
-	path = matching/third_party/Se2_LoFTR
+[submodule "estimator/third_party/Se2_LoFTR"]
+	path = estimator/third_party/Se2_LoFTR
 	url = https://github.com/alexstoken/se2-loftr.git
-[submodule "matching/third_party/aspanformer"]
-	path = matching/third_party/aspanformer
+[submodule "estimator/third_party/aspanformer"]
+	path = estimator/third_party/aspanformer
 	url = https://github.com/alexstoken/ml-aspanformer.git
-[submodule "matching/third_party/MatchFormer"]
-	path = matching/third_party/MatchFormer
+[submodule "estimator/third_party/MatchFormer"]
+	path = estimator/third_party/MatchFormer
 	url = https://github.com/jamycheung/MatchFormer.git
-[submodule "matching/third_party/mast3r"]
-	path = matching/third_party/mast3r
+[submodule "estimator/third_party/mast3r"]
+	path = estimator/third_party/mast3r
 	url = https://github.com/naver/mast3r.git
-[submodule "matching/third_party/mickey"]
-	path = matching/third_party/mickey
+[submodule "estimator/third_party/mickey"]
+	path = estimator/third_party/mickey
 	url = https://github.com/nianticlabs/mickey
-[submodule "matching/third_party/keypt2subpx"]
-	path = matching/third_party/keypt2subpx
+[submodule "estimator/third_party/keypt2subpx"]
+	path = estimator/third_party/keypt2subpx
 	url = https://github.com/KimSinjeong/keypt2subpx.git
