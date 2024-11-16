@@ -92,12 +92,12 @@ def parse_args():
     parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
     parser.add_argument("--no_viz", action="store_true", help="avoid saving visualizations")
 
-    parser.add_argument(
-        "--input",
-        type=str,
-        default="assets/example_pairs",
-        help="path to either (1) dir with dirs with image pairs or (2) txt file with two image paths per line",
-    )
+    # parser.add_argument(
+    #     "--input",
+    #     type=str,
+    #     default="assets/example_pairs",
+    #     help="path to either (1) dir with dirs with image pairs or (2) txt file with two image paths per line",
+    # )
     parser.add_argument("--out_dir", type=Path, default=None, help="path where outputs are saved")
 
     args = parser.parse_args()

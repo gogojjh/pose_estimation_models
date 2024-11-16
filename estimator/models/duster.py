@@ -13,9 +13,8 @@ add_to_path(THIRD_PARTY_DIR.joinpath('duster'))
 from dust3r.inference import inference
 from dust3r.model import AsymmetricCroCo3DStereo
 from dust3r.image_pairs import make_pairs
+from dust3r.utils.image import load_images
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
-from dust3r.utils.geometry import find_reciprocal_matches, xy_grid
-
 
 class Dust3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("duster_vit_large.pth")
@@ -41,6 +40,9 @@ class Dust3rEstimator(BaseEstimator):
             print("Downloading Dust3r(ViT large)... (takes a while)")
             py3_wget.download_file(url, Dust3rEstimator.model_path)
 
+    def show_reconstruction(self, cam_size=0.2):
+        self.scene.show(cam_size=cam_size)
+
     def preprocess(self, img):
         _, h, w = img.shape
         orig_shape = h, w
@@ -49,34 +51,43 @@ class Dust3rEstimator(BaseEstimator):
         img = self.normalize(img).unsqueeze(0)
         return img, orig_shape
 
-    def _forward(self, list_img0, img1, list_img0_poses, init_img1_pose, list_img0_K, img1_K, option):
-        images = []
-        for i, img0 in enumerate(list_img0):
-            img0_pre, _ = self.preprocess(img0)
-            images.append({"img": img0_pre, 
-                           "idx": i, 
-                           "instance": i, 
-                           "true_shape": np.int32([img0.shape[-2:]])})
+    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, init_img1_pose, list_img0_K, img1_K, option):
+        """
+        Performs the forward pass of the pose estimation model.
 
-        img1_pre, _ = self.preprocess(img1)
-        images.append({"img": img1_pre, 
-                       "idx": len(list_img0), 
-                       "instance": len(list_img0), 
-                       "true_shape": np.int32([img1.shape[-2:]])})
+        Args:
+            scene_root (str): The root directory of the scene.
+            list_img0_name (list): A list of image names for the reference images.
+            img1_name (str): The name of the target image.
+            list_img0_poses (list): A list of poses for the reference images.
+            init_img1_pose (Pose): The initial pose for the target image.
+            list_img0_K (list): A list of intrinsic camera matrices for the reference images.
+            img1_K (matrix): The intrinsic camera matrix for the target image.
+            option (dict): Additional options for the pose estimation.
 
+        Returns:
+            tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
+        """
+
+        imgs_path = [scene_root / img_name for img_name in list_img0_name]
+        imgs_path.append(scene_root / img1_name)
+
+        resize = option.get('resize', 512)
+        images = load_images(imgs_path, size=resize)
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
 
         ##### GlobalAlignerMode.PointCloudOptimizer
         scene = global_aligner(output, device=self.device, mode=GlobalAlignerMode.ModularPointCloudOptimizer, verbose=self.verbose)
-        if option == 'single':
-            known_poses = [pose for pose in list_img0_poses] + [init_img1_pose] # Pose: from world to camera
+        if option['opt_cam'] == 'single':
+            known_poses = [pose for pose in list_img0_poses]
+            known_poses.append(init_img1_pose)
             scene.preset_pose(known_poses=known_poses,
                               pose_msk=[True] * len(list_img0_poses) + [False])
         # if list_img0_K is not None:
         #     scene.preset_intrinsics(list_img0_K + [img1_K])
         
-        # Perform optimization
+        ##### Perform optimization
         loss = scene.compute_global_alignment(init="mst", niter=self.niter, schedule=self.schedule, lr=self.lr)
 
         ##### Get results
@@ -86,4 +97,4 @@ class Dust3rEstimator(BaseEstimator):
         # print('poses:\n', im_poses, im_poses.shape)
 
         self.scene = scene
-        return est_focal, est_im_pose, loss
+        return est_focal.detach(), est_im_pose.detach(), loss
