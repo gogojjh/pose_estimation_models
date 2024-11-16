@@ -46,3 +46,9 @@
 [submodule "estimator/third_party/keypt2subpx"]
 	path = estimator/third_party/keypt2subpx
 	url = https://github.com/KimSinjeong/keypt2subpx.git
+[submodule "estimator/third_party/pixel-perfect-sfm"]
+	path = estimator/third_party/pixel-perfect-sfm
+	url = https://github.com/cvg/pixel-perfect-sfm.git
+[submodule "estimator/third_party/Hierarchical-Localization"]
+	path = estimator/third_party/Hierarchical-Localization
+	url = https://github.com/cvg/Hierarchical-Localization.git
