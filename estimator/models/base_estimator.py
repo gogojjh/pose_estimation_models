@@ -167,7 +167,6 @@ class BaseEstimator(torch.nn.Module):
                           list_img0_poses, init_img1_pose, 
                           list_img0_K, img1_K, 
                           option)
-
         return {
             "focal": to_numpy(est_focal),
             "im_pose": to_numpy(est_im_pose),

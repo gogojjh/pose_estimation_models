@@ -172,3 +172,4 @@ def add_to_path(path: Union[str, Path], insert=None) -> None:
         sys.path.append(path)
     else:
         sys.path.insert(insert, path)
+

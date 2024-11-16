@@ -144,7 +144,9 @@ class HlocEstimator(BaseEstimator):
         viz_3d.plot_points(scene, inl_3d, color="lime", ps=1, name=self.query_name)
         scene.write_image(self.scene_root / "reconstruction.png")
 
-        scene.show()
+        for image in self.model.images.values(): print(image)
+
+        # scene.show()
 
     def recover_metric_pose(self, pose_img_dict):
         ##### Aligning colmap poses with groundtruth poses: scale, rotation, translation
@@ -166,8 +168,7 @@ class HlocEstimator(BaseEstimator):
         ##### Compute ATE        
         ate = compute_ATE(poses_gt, poses_pred)
         print('ATE before alignment: ', ate)
-        for i in range(1, len(poses_pred), 1): print(poses_pred[i, :3, 3].T, poses_gt[i, :3, 3].T)
-        
+        # for i in range(1, len(poses_pred), 1): print(poses_pred[i, :3, 3].T, poses_gt[i, :3, 3].T)
         ate = compute_ATE(poses_gt, c2ws_est_aligned)
         print('ATE after alignment: ', ate)
         for i in range(1, len(c2ws_est_aligned), 1): print(c2ws_est_aligned[i, :3, 3].T, poses_gt[i, :3, 3].T)
@@ -247,7 +248,7 @@ class HlocEstimator(BaseEstimator):
         pose_img_dict[query] = init_img1_pose
         est_im_pose = self.recover_metric_pose(pose_img_dict)
 
-        est_focal = query_camera.params[0]
+        est_focal = np.array(query_camera.params[0])
         loss = model.compute_mean_reprojection_error()
 
         return est_focal, est_im_pose, loss

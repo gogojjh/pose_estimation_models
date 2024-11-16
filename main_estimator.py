@@ -19,15 +19,14 @@ if not hasattr(sys, "ps1"):
     matplotlib.use("Agg")
 
 def main(args):
-    image_size = [288, 512]
-    args.out_dir.mkdir(exist_ok=True, parents=True)
-
+    # image_size = [288, 512]
+    # args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device)
 
     # Load images
-    scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
+    scene_root = Path('/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/')
     for i in range(1):
-        list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(20)]
+        list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(30)]
         img1_name = 'seq0/frame_00000.jpg'
 
         import numpy as np
