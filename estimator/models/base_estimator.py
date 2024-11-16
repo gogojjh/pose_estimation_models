@@ -141,53 +141,41 @@ class BaseEstimator(torch.nn.Module):
         return img, orig_shape
 
     def forward(
-        self, 
-        list_img0, img1, 
+        self,
+        scene_root: Path,
+        list_img0_name, img1_name, 
         list_img0_poses, init_img1_pose, 
         list_img0_K, img1_K,
         option="all"
     ) -> dict:
-        """
-        All sub-classes implement the following interface:
-
-        Parameters
-        ----------
-        list_img0 : list of torch.tensor (C x H x W) | str | Path
-            List of images from reference cameras
-        img1 : torch.tensor (C x H x W) | str | Path
-            Image from the target camera
-        list_img0_poses : list of np.ndarray (4 x 4)
-            List of camera poses for images from reference cameras
-        list_img0_K : list of np.ndarray (3 x 3)
-            List of camera intrinsic matrices for images from the target camera
-        img_K : np.ndarray (3 x 3)
-            Camera intrinsic matrix for image from camera 1
-
-        Returns
-        -------
-        dict with keys: ['focal', 'im_pose', 'loss']
-        """
-        assert list_img0
+        assert list_img0_name, "list_img0 is empty"
 
         # Take as input a pair of images (not a batch)
-        if isinstance(list_img0[0], (str, Path)):
-            for img in list_img0:
-                img = BaseEstimator.load_image(img)
-        if isinstance(img1, (str, Path)):
-            img1 = BaseEstimator.load_image(img1)
+        # if isinstance(list_img0[0], (str, Path)):
+        #     for img in list_img0:
+        #         img = BaseEstimator.load_image(img)
+        # if isinstance(img1, (str, Path)):
+        #     img1 = BaseEstimator.load_image(img1)
 
-        for img in list_img0: assert isinstance(img, torch.Tensor)
-        assert isinstance(img1, torch.Tensor)
+        # for img in list_img0: assert isinstance(img, torch.Tensor)
+        # assert isinstance(img1, torch.Tensor)
 
         # self._forward() is implemented by the children modules
         est_focal, est_im_pose, loss = \
-            self._forward(list_img0, img1, list_img0_poses, init_img1_pose, list_img0_K, img1_K, option)
+            self._forward(scene_root, 
+                          list_img0_name, img1_name, 
+                          list_img0_poses, init_img1_pose, 
+                          list_img0_K, img1_K, 
+                          option)
 
         return {
-            "focal": to_numpy(est_focal.detach()),
-            "im_pose": to_numpy(est_im_pose.detach()),
+            "focal": to_numpy(est_focal),
+            "im_pose": to_numpy(est_im_pose),
             "loss": loss
         }
+
+    def show_reconstruction(self):
+        pass
 
     # def extract(self, img: str | Path | torch.Tensor) -> dict:
     #     # Take as input a pair of images (not a batch)

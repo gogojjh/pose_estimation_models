@@ -52,3 +52,6 @@
 [submodule "estimator/third_party/Hierarchical-Localization"]
 	path = estimator/third_party/Hierarchical-Localization
 	url = https://github.com/cvg/Hierarchical-Localization.git
+[submodule "estimator/third_party/CF-3DGS"]
+	path = estimator/third_party/CF-3DGS
+	url = https://github.com/NVlabs/CF-3DGS.git

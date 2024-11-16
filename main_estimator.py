@@ -25,22 +25,53 @@ def main(args):
     estimator = get_estimator(args.model, device=args.device)
 
     # Load images
-    list_img0_path = ['/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/seq0/frame_00000.jpg',
-                      '/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/seq1/frame_00000.jpg']
-    img1_path = '/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/seq1/frame_00001.jpg'
+    scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
     for i in range(1):
-        list_img0 = [estimator.load_image(img0_path, resize=image_size) for img0_path in list_img0_path]
-        img1 = estimator.load_image(img1_path, resize=image_size)
-        list_img0_poses = [torch.eye(4) for _ in list_img0_path]
-        init_img1_pose = torch.eye(4)
-        list_img0_K = [torch.eye(3) for _ in list_img0_path]
+        list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(20)]
+        img1_name = 'seq0/frame_00000.jpg'
+
+        import numpy as np
+        import pycolmap
+        poses_load = {}
+        with (scene_root / 'poses.txt').open('r') as f:
+            for line in f.readlines():
+                if '#' in line:
+                    continue
+                line = line.strip().split(' ')
+                img_name = line[0]
+                qt = np.array(list(map(float, line[1:])))
+                pose = pycolmap.Rigid3d()
+                pose.translation = qt[4:]
+                pose.rotation = pycolmap.Rotation3d(np.roll(qt[:4], -1))
+                poses_load[img_name] = pose
+        
+        list_img0_poses = []
+        for name in list_img0_name:
+            pose = np.eye(4)
+            pose[:3, :] = poses_load[name].matrix()
+            list_img0_poses.append(torch.from_numpy(pose))
+        pose = np.eye(4)
+        pose[:3, :] = poses_load[img1_name].matrix()
+        init_img1_pose = torch.from_numpy(pose)
+        # list_img0_poses = [torch.eye(4) for _ in list_img0_name]
+        # init_img1_pose = torch.eye(4)
+
+        list_img0_K = [torch.eye(3) for _ in list_img0_name]
         img1_K = torch.eye(3)
 
         start_time = time.time()
-        result = estimator(list_img0, img1, list_img0_poses, init_img1_pose, list_img0_K, img1_K, option='all')
+        option = {
+            'known_camera_params': False,
+            'resize': 512,
+            'opt_cam': 'all',
+        }
+        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, init_img1_pose, list_img0_K, img1_K, option)
         print(f"Processing time: {time.time() - start_time:.2f}s")
+        print('Focal length: ', result['focal'])
+        print('Estimated pose: ', result['im_pose'][:3, 3:4].T)
+        print('Loss:', result['loss'])
 
-        estimator.scene.show()
+        estimator.show_reconstruction(cam_size=0.2)
 
 def parse_args():
     parser = argparse.ArgumentParser(
