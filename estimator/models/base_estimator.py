@@ -144,9 +144,10 @@ class BaseEstimator(torch.nn.Module):
         self,
         scene_root: Path,
         list_img0_name, img1_name, 
-        list_img0_poses, init_img1_pose, 
+        list_img0_poses, 
         list_img0_K, img1_K,
-        option="all"
+        img_size,
+        est_opts
     ) -> dict:
         assert list_img0_name, "list_img0 is empty"
 
@@ -164,9 +165,11 @@ class BaseEstimator(torch.nn.Module):
         est_focal, est_im_pose, loss = \
             self._forward(scene_root, 
                           list_img0_name, img1_name, 
-                          list_img0_poses, init_img1_pose, 
+                          list_img0_poses, 
                           list_img0_K, img1_K, 
-                          option)
+                          img_size,
+                          est_opts=est_opts)
+        if isinstance(est_focal, (int, float)): est_focal = np.array([est_focal])
         return {
             "focal": to_numpy(est_focal),
             "im_pose": to_numpy(est_im_pose),

@@ -30,7 +30,7 @@ def get_version(pkg):
     return major, minor, patch
 
 # @supress_stdout
-def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048, *args, **kwargs):
+def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048, out_dir='/tmp', *args, **kwargs):
     if 'hloc' in estimator_name:
         from estimator.models import hloc
         
@@ -80,7 +80,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
                 f"Matcher {name2} for hloc not yet supported. Consider submitted a PR to add it. Available models: {available_models}"
             )
 
-        return hloc.HlocEstimator(device, feature_name, matcher_name, max_num_keypoints, *args, **kwargs)
+        return hloc.HlocEstimator(device, feature_name, matcher_name, max_num_keypoints, out_dir, *args, **kwargs)
 
     if estimator_name in ["duster", "dust3r"]:
         from estimator.models import duster

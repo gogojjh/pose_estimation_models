@@ -6,11 +6,38 @@ import torchvision.transforms as tfm
 import os, contextlib
 from yacs.config import CfgNode as CN
 from typing import Union
+from scipy.spatial.transform import Rotation
 import sys
 
 logger = logging.getLogger()
 logger.setLevel(31)  # Avoid printing useless low-level logs
 
+def convert_vec_to_matrix(vec_p, vec_q, mode='xyzw'):
+	# Initialize a 4x4 identity matrix
+	tf = np.eye(4)
+	if mode == 'xyzw':
+		# Set the rotation part of the transformation matrix using the quaternion
+		tf[:3, :3] = Rotation.from_quat(vec_q).as_matrix()
+		# Set the translation part of the transformation matrix
+		tf[:3, 3] = vec_p
+	elif mode == 'wxyz':
+		# Set the rotation part of the transformation matrix using the quaternion
+		tf[:3, :3] = Rotation.from_quat(np.roll(vec_q, -1)).as_matrix()
+		# Set the translation part of the transformation matrix
+		tf[:3, 3] = vec_p
+	return tf
+def convert_matrix_to_vec(tf_matrix, mode='xyzw'):
+	if mode == 'xyzw':
+		# Extract the translation vector from the matrix
+		vec_p = tf_matrix[:3, 3]
+		# Extract the rotation part of the matrix and convert it to a quaternion
+		vec_q = Rotation.from_matrix(tf_matrix[:3, :3]).as_quat()
+	if mode == 'wxyz':
+		# Extract the translation vector from the matrix
+		vec_p = tf_matrix[:3, 3]
+		# Extract the rotation part of the matrix and convert it to a quaternion
+		vec_q = np.roll(Rotation.from_matrix(tf_matrix[:3, :3]).as_quat(), 1)
+	return vec_p, vec_q
 
 def get_image_pairs_paths(inputs):
     inputs = Path(inputs)

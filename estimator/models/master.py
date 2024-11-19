@@ -52,7 +52,7 @@ class Mast3rEstimator(BaseEstimator):
         img = self.normalize(img).unsqueeze(0)
         return img, orig_shape
     
-    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, init_img1_pose, list_img0_K, img1_K, option):
+    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_K, img1_K, img_size, est_opts):
         """
         Performs the forward pass of the pose estimation model.
 
@@ -61,30 +61,26 @@ class Mast3rEstimator(BaseEstimator):
             list_img0_name (list): A list of image names for the reference images.
             img1_name (str): The name of the target image.
             list_img0_poses (list): A list of poses for the reference images.
-            init_img1_pose (Pose): The initial pose for the target image.
             list_img0_K (list): A list of intrinsic camera matrices for the reference images.
             img1_K (matrix): The intrinsic camera matrix for the target image.
-            option (dict): Additional options for the pose estimation.
+            est_opts (dict): Additional options for the pose estimation.
 
         Returns:
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
 
-        imgs_path = [scene_root / img_name for img_name in list_img0_name]
-        imgs_path.append(scene_root / img1_name)
-
-        resize = option.get('resize', 512)
+        imgs_path = [str(scene_root / img_name) for img_name in list_img0_name] + [str(scene_root / img1_name)]
+        resize = est_opts.get('resize', 512)
         images = load_images(imgs_path, size=resize)
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
 
         ##### GlobalAlignerMode.PointCloudOptimizer
         scene = global_aligner(output, device=self.device, mode=GlobalAlignerMode.ModularPointCloudOptimizer, verbose=self.verbose)
-        if option['opt_cam'] == 'single':
-            known_poses = [pose for pose in list_img0_poses]
-            known_poses.append(init_img1_pose)
-            scene.preset_pose(known_poses=known_poses,
-                              pose_msk=[True] * len(list_img0_poses) + [False])
+        if est_opts['known_extrinsics']:
+            known_poses = [pose for pose in list_img0_poses] + [np.eye(4)]
+            scene.preset_pose(known_poses=known_poses, pose_msk=[True] * len(list_img0_poses) + [False])
+        # TODO(gogojjh):
         # if list_img0_K is not None:
         #     scene.preset_intrinsics(list_img0_K + [img1_K])
         
@@ -94,8 +90,6 @@ class Mast3rEstimator(BaseEstimator):
         ##### Get results
         focals, im_poses = scene.get_focals(), scene.get_im_poses()
         est_focal, est_im_pose = focals[-1], im_poses[-1]
-        # print('focals:\n', focals)
-        # print('poses:\n', im_poses, im_poses.shape)
 
         self.scene = scene
         return est_focal.detach(), est_im_pose.detach(), loss
