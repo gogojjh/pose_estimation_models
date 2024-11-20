@@ -51,7 +51,7 @@ class Dust3rEstimator(BaseEstimator):
         img = self.normalize(img).unsqueeze(0)
         return img, orig_shape
 
-    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_K, img1_K, img_size, est_opts):
+    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
         """
         Performs the forward pass of the pose estimation model.
 
@@ -60,8 +60,8 @@ class Dust3rEstimator(BaseEstimator):
             list_img0_name (list): A list of image names for the reference images.
             img1_name (str): The name of the target image.
             list_img0_poses (list): A list of poses for the reference images.
-            list_img0_K (list): A list of intrinsic camera matrices for the reference images.
-            img1_K (matrix): The intrinsic camera matrix for the target image.
+            list_img0_intr (list): A list of intrinsic camera matrices for the reference images.
+            img1_intr (dict): The intrinsic camera matrix for the target image.
             est_opts (dict): Additional options for the pose estimation.
 
         Returns:
@@ -79,6 +79,7 @@ class Dust3rEstimator(BaseEstimator):
         if est_opts['known_extrinsics']:
             known_poses = [pose for pose in list_img0_poses] + [np.eye(4)]
             scene.preset_pose(known_poses=known_poses, pose_msk=[True] * len(list_img0_poses) + [False])
+            
         # TODO(gogojjh):
         # if list_img0_K is not None:
         #     scene.preset_intrinsics(list_img0_K + [img1_K])

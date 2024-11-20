@@ -160,7 +160,7 @@ class HlocEstimator(BaseEstimator):
         # scene.show()
 
     # TODO(gogojjh): this function is not used
-    def recover_metric_pose(self, poses_pred, poses_gt, query_pose):
+    # def recover_metric_pose(self, poses_pred, poses_gt, query_pose):
         # ##### Aligning colmap poses with groundtruth poses: scale, rotation, translation
         # c2ws_est_aligned, ret_align = align_ate_c2b_use_a2b(poses_pred, poses_gt)
         # ##### Compute ATE        
@@ -185,7 +185,7 @@ class HlocEstimator(BaseEstimator):
         # plot_pose(poses_gt, c2ws_est_aligned, self.scene_root)
 
         # return metric_query_pose
-        pass
+        # pass
 
     def feature_process(self, scene_root, references, query):
         ##### Extract features, match features, and triangulation of reference images
@@ -227,7 +227,7 @@ class HlocEstimator(BaseEstimator):
 
         return model, ret_query, est_focal, est_im_pose, loss
     
-    def estimate_pose_with_int_and_ext(self, scene_root, references, query, reference_poses, reference_Ks, query_K, img_size):
+    def estimate_pose_with_int_and_ext(self, scene_root, references, query, reference_poses, reference_ints, query_int):
         # Reference images
         images, cameras = {}, {}
         for idx, ref_img in enumerate(references):
@@ -242,8 +242,9 @@ class HlocEstimator(BaseEstimator):
             images[idx] = image
 
             fx, fy, cx, cy, width, height = \
-                reference_Ks[idx][0][0], reference_Ks[idx][1][1], reference_Ks[idx][0][2], reference_Ks[idx][1][2], \
-                img_size[0], img_size[1]
+                reference_ints[idx]['K'][0][0], reference_ints[idx]['K'][1][1], \
+                reference_ints[idx]['K'][0][2], reference_ints[idx]['K'][1][2], \
+                reference_ints[idx]['im_size'][0], reference_ints[idx]['im_size'][1]
             camera = Camera(
                 id=idx, model='PINHOLE', 
                 width=int(width), height=int(height), 
@@ -269,6 +270,7 @@ class HlocEstimator(BaseEstimator):
         extract_features.main(self.feature_conf, scene_root, image_list=[query], feature_path=self.path_features, overwrite=True)
         pairs_from_exhaustive.main(self.path_loc_pairs, image_list=[query], ref_list=references)
         match_features.main(self.matcher_conf, self.path_loc_pairs, features=self.path_features, matches=self.path_matches, overwrite=True)        
+        fx, fy, cx, cy = query_int['K'][0][0], query_int['K'][1][1], query_int['K'][0][2], query_int['K'][1][2]
         cam_opts = dict(camera_model='PINHOLE', camera_params=','.join(map(str, [fx, fy, cx, cy])))
         query_camera = pycolmap.infer_camera_from_image(scene_root / query, cam_opts)
         # Perform localization
@@ -289,10 +291,10 @@ class HlocEstimator(BaseEstimator):
 
         return model, ret_query, est_focal, est_im_pose, loss
 
-    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_K, img1_K, img_size, est_opts):
+    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
         list_img0_poses = [to_numpy(pose) for pose in list_img0_poses]
-        list_img0_K = [to_numpy(K) for K in list_img0_K]
-        img1_K = to_numpy(img1_K)
+        list_img0_intr = [{'K': to_numpy(intrinsics['K']), 'im_size': to_numpy(intrinsics['im_size'])} for intrinsics in list_img0_intr]
+        img1_intr = {'K': to_numpy(img1_intr['K']), 'im_size': to_numpy(img1_intr['im_size'])}
 
         self.path_sfm_pairs = self.out_dir / "pairs-sfm.txt"
         self.path_loc_pairs = self.out_dir / "pairs-loc.txt"
@@ -306,11 +308,11 @@ class HlocEstimator(BaseEstimator):
             # estimate query poses with known extrinsics
             model, ret_query, est_focal, est_im_pose, loss = \
                 self.estimate_pose_with_int_and_ext(scene_root, list_img0_name, img1_name, 
-                                                    list_img0_poses, list_img0_K, img1_K, img_size)
+                                                    list_img0_poses, list_img0_intr, img1_intr)
         elif est_opts['known_intrinsics']:
             # estimate reference and query poses with known intrinsics
             # assume the same intrinsics for all images
-            fx, fy, cx, cy = list_img0_K[0][0][0], list_img0_K[0][1][1], list_img0_K[0][0][2], list_img0_K[0][1][2]
+            fx, fy, cx, cy = list_img0_intr['K'][0][0], list_img0_intr['K'][1][1], list_img0_intr['K'][0][2], list_img0_intr['K'][1][2]
             cam_opts = dict(camera_model='PINHOLE', camera_params=','.join(map(str, [fx, fy, cx, cy])))
             mapper_opts = dict(ba_refine_focal_length=False, ba_refine_extra_params=False)
             model, ret_query, est_focal, est_im_pose, loss = \

@@ -145,29 +145,17 @@ class BaseEstimator(torch.nn.Module):
         scene_root: Path,
         list_img0_name, img1_name, 
         list_img0_poses, 
-        list_img0_K, img1_K,
-        img_size,
+        list_img0_intr, img1_intr,
         est_opts
     ) -> dict:
         assert list_img0_name, "list_img0 is empty"
-
-        # Take as input a pair of images (not a batch)
-        # if isinstance(list_img0[0], (str, Path)):
-        #     for img in list_img0:
-        #         img = BaseEstimator.load_image(img)
-        # if isinstance(img1, (str, Path)):
-        #     img1 = BaseEstimator.load_image(img1)
-
-        # for img in list_img0: assert isinstance(img, torch.Tensor)
-        # assert isinstance(img1, torch.Tensor)
 
         # self._forward() is implemented by the children modules
         est_focal, est_im_pose, loss = \
             self._forward(scene_root, 
                           list_img0_name, img1_name, 
                           list_img0_poses, 
-                          list_img0_K, img1_K, 
-                          img_size,
+                          list_img0_intr, img1_intr,
                           est_opts=est_opts)
         if isinstance(est_focal, (int, float)): est_focal = np.array([est_focal])
         return {

@@ -21,15 +21,14 @@ if not hasattr(sys, "ps1"):
     matplotlib.use("Agg")
 
 def main(args):
-    image_size = [288, 512]
     args.out_dir.mkdir(exist_ok=True, parents=True)
-    estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint,
-                              out_dir=args.out_dir, image_size=image_size)
+    estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
 
     # Load images
-    N_ref_image = 15
+    N_ref_image = 3
     scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
     K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
+    im_size = np.array([640, 360])
     for i in range(1):
         list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(N_ref_image)]
         img1_name = 'seq0/frame_00000.jpg'
@@ -56,10 +55,8 @@ def main(args):
         pose = np.eye(4)
         pose[:3, :] = poses_load[img1_name].matrix()
 
-        list_img0_K = [torch.from_numpy(K) for _ in list_img0_name]
-        img1_K = torch.from_numpy(K)
-
-        img_size = torch.from_numpy(np.array([640, 360]))
+        list_img0_intr = [{'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)} for _ in list_img0_name]
+        img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
         start_time = time.time()
         option = {
@@ -67,13 +64,13 @@ def main(args):
             'known_intrinsics': True,
             'resize': 512,
         }
-        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_K, img1_K, img_size, option)
+        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, option)
         print(f"Processing time: {time.time() - start_time:.2f}s")
         print('Focal length: ', result['focal'][0])
         print('Estimated pose: ', result['im_pose'][:3, 3:4].T)
         print('Loss:', result['loss'])
 
-        estimator.show_reconstruction(cam_size=1.0)
+        estimator.show_reconstruction(cam_size=0.2)
 
 def parse_args():
     parser = argparse.ArgumentParser(
