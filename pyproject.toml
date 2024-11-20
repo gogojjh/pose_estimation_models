@@ -5,19 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pose_estimation_models"
 readme = "README.md"
-description = "Easily test and apply pairwise image matching models"
+description = "Easily test and apply pairwise pose estimation models"
 authors = [
-  {name = "Gabriele Berton"},{email = "berton.gabri@gmail.com"},
-  {name = "Gabriele Trivigno", email="gabriele.trivigno@polito.it"},
-  {name = "Alex Stoken", email = "alex.stoken@gmail.com"},
+  {name = "Jianhao Jiao"},{email = "jiaojh1994@gmail.com"},
 ]
 maintainers = [
-  {name = "Gabriele Berton"},{email = "berton.gabri@gmail.com"},
-  {name = "Alex Stoken", email = "alex.stoken@gmail.com"},
+  {name = "Jianhao Jiao"},{email = "jiaojh1994@gmail.com"},
 ]
-requires-python = ">= 3.10"
+requires-python = ">= 3.8"
 license = {file = "LICENSE"}
-keywords = ["image matching"]
+keywords = ["pose estimation"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python"
@@ -27,9 +24,9 @@ dynamic = ["version",
 
 
 [project.urls]
-Homepage = "https://github.com/gmberton/image-matching-models"
+Homepage = "https://github.com/gogojjh/pose_estimation_models"
 # Documentation = "https://readthedocs.org"
-Repository = "https://github.com/gmberton/image-matching-models"
+Repository = "https://github.com/gogojjh/pose_estimation_models"
 # "Bug Tracker" = "https://github.com/me/spam/issues"
 # Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
@@ -37,24 +34,7 @@ Repository = "https://github.com/gmberton/image-matching-models"
 dependencies = { file = [
   "./requirements.txt",
 ] }
-version = { attr = "matching.__version__" }
+version = { attr = "estimator.__version__" }
 
 [tool.setuptools.packages]
 find = {}
-
-[project.optional-dependencies]
-silk = [
-        "hydra-core",
-        "pytorch-lightning==1.5.2",
-        "jax",
-        "jaxlib"
-        ]
-
-loftrs = ["pytorch-lightning==1.5.2"
-            ]
-
-omniglue = ["tensorflow"
-            ] 
-
-duster = ["huggingface_hub"]
-all = ["image-matching-models[loftrs, omniglue, duster]"]

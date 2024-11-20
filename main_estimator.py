@@ -20,18 +20,35 @@ from estimator import get_estimator, available_models
 if not hasattr(sys, "ps1"):
     matplotlib.use("Agg")
 
+##### Load images
+# Matterport3d
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
+# K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
+# im_size = np.array([640, 360])
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': True,
+#     'resize': 512,
+# }
+
+# Wildscene
+N_ref_image = 8
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/wildscene/map_free_eval/test/s00000_test/')
+K = np.array([[1322.75469666, 0.0, 1014.8117275], [0.0, 1321.88964261, 752.801443314], [0.0, 0.0, 1.0]])
+im_size = np.array([2016, 1512])
+est_opts = {
+    'known_extrinsics': False,
+    'known_intrinsics': False,
+    'resize': 512,
+}
+
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
-
-    # Load images
-    N_ref_image = 3
-    scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
-    K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
-    im_size = np.array([640, 360])
     for i in range(1):
-        list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(N_ref_image)]
-        img1_name = 'seq0/frame_00000.jpg'
+        list_img0_name = [f'seq1/frame_{index:05}.png' for index in range(N_ref_image)]
+        img1_name = 'seq0/frame_00000.png'
 
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
@@ -59,18 +76,13 @@ def main(args):
         img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
         start_time = time.time()
-        option = {
-            'known_extrinsics': True,
-            'known_intrinsics': True,
-            'resize': 512,
-        }
-        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, option)
+        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
         print(f"Processing time: {time.time() - start_time:.2f}s")
         print('Focal length: ', result['focal'][0])
         print('Estimated pose: ', result['im_pose'][:3, 3:4].T)
         print('Loss:', result['loss'])
 
-        estimator.show_reconstruction(cam_size=0.2)
+        estimator.show_reconstruction()
 
 def parse_args():
     parser = argparse.ArgumentParser(

@@ -50,8 +50,8 @@ SIFT and DeDoDe
 ### From Source [Recommended]
 If you want to to install from source (easiest to edit, use `benchmark.py`, `demo.ipynb`), 
 ```bash
-git clone --recursive https://github.com/gmberton/image-matching-models
-cd image-matching-models
+git clone --recursive https://github.com/gogojjh/pose_estimation_models
+cd pose_estimation_models
 pip install .
 ```
 Some models (`omniglue`, LoFTR family) require one-off dependencies (`tensorflow`, `pytorch-lightning`), which are not included in the default list. To install these, use 
@@ -63,7 +63,7 @@ This will install all dependencies needed to run all models.
 ### As package (simplest)
 You can install directly to your package directory with 
 ```bash
-pip install git+https://github.com/gmberton/image-matching-models.git
+pip install git+https://github.com/gogojjh/pose_estimation_models.git
 ```
 Similar to the above, to get all optional dependencies, use the `[all]` addendum:
 ```bash

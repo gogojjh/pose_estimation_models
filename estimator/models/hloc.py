@@ -209,7 +209,10 @@ class HlocEstimator(BaseEstimator):
         cnt = sum(1 for image in model.images.values() if image.num_points3D > num_med_points3D / 2)
         print('Successful trianglation:', cnt, '/', len(model.images))
         ##### Perform localization
-        query_camera = pycolmap.infer_camera_from_image(scene_root / query, cam_opts)
+        if cam_opts is not None:
+            query_camera = pycolmap.infer_camera_from_image(scene_root / query, cam_opts)
+        else:
+            query_camera = pycolmap.infer_camera_from_image(scene_root / query)
         ref_ids = [model.find_image_with_name(r).image_id for r in references if model.find_image_with_name(r) is not None]
         localizer = QueryLocalizer(model, self.loc_conf)
         ret, log = pose_from_cluster(localizer, query, query_camera, ref_ids, self.path_features, self.path_matches)

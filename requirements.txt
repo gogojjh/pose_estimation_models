@@ -1,29 +1,33 @@
-# usage: pip install -r requirements.txt
-torch>=2.2.0
+# duster
+torch
 torchvision
-opencv-python
-matplotlib
-kornia
-einops
-transforms3d
-h5py
-kornia_moons
-yacs
-gdown>=5.1.0
-tables
-imageio
-vispy
-xformers; os.name != 'nt'
-pyglet==1.5.28
-tensorboard
-scipy
-trimesh
-e2cnn
-scikit-learn
-scikit-image
-tqdm
-py3_wget
 roma
-loguru
-timm
-omegaconf
+gradio
+matplotlib
+tqdm
+opencv-python
+scipy
+einops
+trimesh
+tensorboard
+pyglet<2
+huggingface-hub[torch]>=0.22
+# master
+scikit-learn
+# hloc
+torch>=1.1
+torchvision>=0.3
+numpy
+opencv-python
+tqdm>=4.36.0
+matplotlib
+plotly
+scipy
+h5py
+pycolmap==0.6.0
+kornia>=0.6.11
+gdown
+lightglue @ git+https://github.com/cvg/LightGlue
+# Others
+yacs
+py3_wget
