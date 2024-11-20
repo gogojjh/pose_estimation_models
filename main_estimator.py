@@ -22,7 +22,7 @@ if not hasattr(sys, "ps1"):
 
 ##### Load images
 # Matterport3d
-# N_ref_image = 3
+# N_ref_image = 15
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([640, 360])
@@ -32,23 +32,45 @@ if not hasattr(sys, "ps1"):
 #     'resize': 512,
 # }
 
-# Wildscene
-N_ref_image = 8
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/wildscene/map_free_eval/test/s00000_test/')
-K = np.array([[1322.75469666, 0.0, 1014.8117275], [0.0, 1321.88964261, 752.801443314], [0.0, 0.0, 1.0]])
-im_size = np.array([2016, 1512])
+# ucl_campus
+N_ref_image = 15
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/ucl_campus/map_free_eval/test/s00000/')
+K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
+im_size = np.array([960, 540])
 est_opts = {
-    'known_extrinsics': False,
-    'known_intrinsics': False,
+    'known_extrinsics': True,
+    'known_intrinsics': True,
     'resize': 512,
 }
+
+# 360Loc
+# N_ref_image = 12
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/360loc/map_free_eval/test/s00000_test/')
+# K = np.array([[1055.911, 0.0, 939.453], [0.0, 1052.383, 603.812], [0.0, 0.0, 1.0]])
+# im_size = np.array([1920, 1200])
+# est_opts = {
+#     'known_extrinsics': False,
+#     'known_intrinsics': False,
+#     'resize': 512,
+# }
+
+# Wildscene
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/wildscene/map_free_eval/test/s00000_test/')
+# K = np.array([[1322.75469666, 0.0, 1014.8117275], [0.0, 1321.88964261, 752.801443314], [0.0, 0.0, 1.0]])
+# im_size = np.array([2016, 1512])
+# est_opts = {
+#     'known_extrinsics': False,
+#     'known_intrinsics': False,
+#     'resize': 512,
+# }
 
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
     for i in range(1):
-        list_img0_name = [f'seq1/frame_{index:05}.png' for index in range(N_ref_image)]
-        img1_name = 'seq0/frame_00000.png'
+        list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(N_ref_image)]
+        img1_name = 'seq0/frame_00000.jpg'
 
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:

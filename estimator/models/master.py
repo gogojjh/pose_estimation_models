@@ -9,7 +9,6 @@ from estimator.utils import resize_to_divisible, add_to_path
 add_to_path(THIRD_PARTY_DIR.joinpath("mast3r"))
 
 from mast3r.model import AsymmetricMASt3R
-# from mast3r.fast_nn import fast_reciprocal_NNs
 
 from dust3r.inference import inference
 from dust3r.image_pairs import make_pairs

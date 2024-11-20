@@ -10,9 +10,6 @@ from .models.base_estimator import BaseEstimator
 # add viz2d from lightglue to namespace - thanks lightglue!
 THIRD_PARTY_DIR = Path(__file__).parent.joinpath('third_party')
 
-# add_to_path(THIRD_PARTY_DIR.joinpath('LightGlue'))
-# from lightglue import viz2d  # for quick import later 'from matching import viz2d'
-
 WEIGHTS_DIR = Path(__file__).parent.joinpath("model_weights")
 WEIGHTS_DIR.mkdir(exist_ok=True)
 
@@ -20,6 +17,8 @@ __version__ = "1.0.0"
 
 available_models = [
     "hloc_disk_dilg",
+    "vpr_cosplace_resnet18_512",
+    "vpr_netvlad_resnet18_4096",
     "duster",
     "master",
 ]
@@ -81,6 +80,42 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
             )
 
         return hloc.HlocEstimator(device, feature_name, matcher_name, max_num_keypoints, out_dir, *args, **kwargs)
+
+    if 'vpr' in estimator_name:
+        method_name = estimator_name.split('_')[1]
+        if method_name != 'netvlad' and \
+           method_name != 'convap' and method_name != 'maxvpr' and \
+           method_name != 'eigenplaces' and method_name != 'anyloc' and \
+           method_name != 'cosplace' and method_name != 'sfrs' and \
+           method_name != 'salad' and method_name != 'cricavpr':
+            raise RuntimeError(
+                f"Method {method_name} for vpr not yet supported. Consider submitted a PR to add it. Available models: {available_models}"
+            )
+
+        backbone_name = estimator_name.split('_')[2]
+        if backbone_name == 'vgg16':
+            backbone_name = 'VGG16'
+        elif backbone_name == 'resnet18':
+            backbone_name = 'ResNet18'
+        elif backbone_name == 'resnet50':
+            backbone_name = 'ResNet50'
+        elif backbone_name == 'resnet101':
+            backbone_name = 'ResNet101'
+        elif backbone_name == 'resnet152':
+            backbone_name = 'ResNet152'
+        else:
+            raise RuntimeError(
+                f"Backbone {backbone_name} for vpr not yet supported. Consider submitted a PR to add it. Available models: {available_models}"
+            )
+        
+        des_dimension = int(estimator_name.split('_')[3])
+        if des_dimension != 128 and des_dimension != 256 and des_dimension != 512 and des_dimension != 1024 and des_dimension != 2048 and des_dimension != 4096:
+            raise RuntimeError(
+                f"Descriptor dimension {des_dimension} for vpr not yet supported. Consider submitted a PR to add it. Available models: {available_models}"
+            )
+
+        from estimator.models import vpr
+        return vpr.VPREstimator(device, method_name, backbone_name, des_dimension, out_dir, *args, **kwargs)
 
     if estimator_name in ["duster", "dust3r"]:
         from estimator.models import duster

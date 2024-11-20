@@ -55,3 +55,6 @@
 [submodule "estimator/third_party/CF-3DGS"]
 	path = estimator/third_party/CF-3DGS
 	url = https://github.com/NVlabs/CF-3DGS.git
+[submodule "estimator/third_party/NoPoSplat"]
+	path = estimator/third_party/NoPoSplat
+	url = https://github.com/cvg/NoPoSplat.git

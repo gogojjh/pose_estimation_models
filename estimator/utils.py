@@ -1,4 +1,5 @@
 import logging
+import sys
 from pathlib import Path
 import numpy as np
 import torch
@@ -6,8 +7,11 @@ import torchvision.transforms as tfm
 import os, contextlib
 from yacs.config import CfgNode as CN
 from typing import Union
+
 from scipy.spatial.transform import Rotation
-import sys
+from scipy.optimize import minimize
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 logger = logging.getLogger()
 logger.setLevel(31)  # Avoid printing useless low-level logs
@@ -38,6 +42,89 @@ def convert_matrix_to_vec(tf_matrix, mode='xyzw'):
 		# Extract the rotation part of the matrix and convert it to a quaternion
 		vec_q = np.roll(Rotation.from_matrix(tf_matrix[:3, :3]).as_quat(), 1)
 	return vec_p, vec_q
+
+def affine_combination(d_test, d_train):
+    """
+    Solves the affine combination optimization problem:
+    Minimize ||d_test - Σ(a_i * d_train[i])||_2 subject to Σ(a_i) = 1.
+
+    Parameters:
+    - d_test: np.array, the test descriptor (1D array).
+    - d_train: np.array, database descriptors (2D array, each row is a descriptor).
+
+    Returns:
+    - a_opt: np.array, optimized weights for the affine combination.
+    - loss: float, the L2 loss of the optimized combination.
+    """
+    k = d_train.shape[0]  # Number of database descriptors
+
+    # Define the objective function to minimize
+    def objective(a):
+        combination = np.sum(a[:, np.newaxis] * d_train, axis=0)
+        return np.linalg.norm(d_test - combination)
+
+    # Initial guess for weights
+    a0 = np.ones(k) / k  # Uniform distribution as starting point
+
+    # Constraints: sum of weights equals 1
+    constraints = {'type': 'eq', 'fun': lambda a: np.sum(a) - 1}
+
+    # Bounds: weights can be any real number (change to (0, None) if only positive weights are allowed)
+    bounds = [(0, 1) for _ in range(k)]
+
+    # Solve the optimization problem
+    result = minimize(objective, a0, bounds=bounds, constraints=constraints)
+
+    # Return optimized weights
+    return result.x, objective(result.x)
+
+def pose_interpolation(poses, weights):
+    weights /= np.sum(weights)
+
+    list_quat = [Rotation.from_matrix(pose[:3, :3]).as_quat() for pose in poses]
+    list_tsl = [pose[:3, 3] for pose in poses]
+
+    weighted_quaternion = np.average(list_quat, axis=0, weights=weights)
+    weighted_quaternion /= np.linalg.norm(weighted_quaternion)  # Normalize quaternion
+    final_rotation = Rotation.from_quat(weighted_quaternion).as_matrix()
+
+    translations = np.array(list_tsl)
+    final_translation = np.average(translations, axis=0, weights=weights)
+
+    est_pose = np.eye(4)
+    est_pose[:3, :3] = final_rotation
+    est_pose[:3, 3] = final_translation
+
+    return est_pose
+
+def pca_analysis(db_names, query_names, db_descriptors, query_descriptors):
+    pca = PCA(n_components=2)
+    db_embeddings_2d = pca.fit_transform(db_descriptors)
+    print('DB 2D embedding shape: ', db_embeddings_2d.shape)
+    query_embeddings_2d = pca.transform(query_descriptors)
+    print('Query 2D embedding shape: ', query_embeddings_2d.shape)
+
+    # Plotting the embeddings
+    plt.figure(figsize=(8, 6))
+
+    # Plot database embeddings with text labels
+    for i, (x, y) in enumerate(db_embeddings_2d):
+        plt.scatter(x, y, marker='o', color='blue', label='Database' if i == 0 else "")
+        plt.text(x, y, db_names[i], fontsize=15, color='blue', ha='right', va='bottom')
+
+    # Plot query embeddings with text labels
+    for i, (x, y) in enumerate(query_embeddings_2d):
+        plt.scatter(x, y, marker='^', color='green', label='Query' if i == 0 else "")
+        plt.text(x, y, query_names[i], fontsize=15, color='green', ha='left', va='top')
+
+    # Add labels and legend
+    plt.title("PCA Visualization of Global Descriptors")
+    plt.xlabel("Principal Component 1")
+    plt.ylabel("Principal Component 2")
+    plt.legend()
+    plt.grid(alpha=0.5)
+
+    return plt
 
 def get_image_pairs_paths(inputs):
     inputs = Path(inputs)
