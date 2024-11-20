@@ -315,7 +315,7 @@ class HlocEstimator(BaseEstimator):
         elif est_opts['known_intrinsics']:
             # estimate reference and query poses with known intrinsics
             # assume the same intrinsics for all images
-            fx, fy, cx, cy = list_img0_intr['K'][0][0], list_img0_intr['K'][1][1], list_img0_intr['K'][0][2], list_img0_intr['K'][1][2]
+            fx, fy, cx, cy = list_img0_intr[0]['K'][0][0], list_img0_intr[0]['K'][1][1], list_img0_intr[0]['K'][0][2], list_img0_intr[0]['K'][1][2]
             cam_opts = dict(camera_model='PINHOLE', camera_params=','.join(map(str, [fx, fy, cx, cy])))
             mapper_opts = dict(ba_refine_focal_length=False, ba_refine_extra_params=False)
             model, ret_query, est_focal, est_im_pose, loss = \

@@ -33,10 +33,20 @@ if not hasattr(sys, "ps1"):
 # }
 
 # ucl_campus
-N_ref_image = 20
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/ucl_campus/map_free_eval/test/s00008/')
-K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
-im_size = np.array([960, 540])
+# N_ref_image = 20
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/ucl_campus/map_free_eval/test/s00008/')
+# K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
+# im_size = np.array([960, 540])
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': True,
+#     'resize': 512,
+# }
+
+N_ref_image = 5
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/')
+K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
+im_size = np.array([1280, 720])
 est_opts = {
     'known_extrinsics': True,
     'known_intrinsics': True,
