@@ -33,8 +33,8 @@ if not hasattr(sys, "ps1"):
 # }
 
 # ucl_campus
-N_ref_image = 15
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/ucl_campus/map_free_eval/test/s00000/')
+N_ref_image = 20
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/ucl_campus/map_free_eval/test/s00008/')
 K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
 im_size = np.array([960, 540])
 est_opts = {
@@ -101,7 +101,7 @@ def main(args):
         result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
         print(f"Processing time: {time.time() - start_time:.2f}s")
         print('Focal length: ', result['focal'][0])
-        print('Estimated pose: ', result['im_pose'][:3, 3:4].T)
+        print('Estimated pose: ', result['im_pose'][:3, 3:4].T) # Pose from world to camera
         print('Loss:', result['loss'])
 
         estimator.show_reconstruction()

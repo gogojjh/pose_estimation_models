@@ -100,12 +100,12 @@ def pose_interpolation(poses, weights):
 def pca_analysis(db_names, query_names, db_descriptors, query_descriptors):
     pca = PCA(n_components=2)
     db_embeddings_2d = pca.fit_transform(db_descriptors)
-    print('DB 2D embedding shape: ', db_embeddings_2d.shape)
+    # print('DB 2D embedding shape: ', db_embeddings_2d.shape)
     query_embeddings_2d = pca.transform(query_descriptors)
-    print('Query 2D embedding shape: ', query_embeddings_2d.shape)
+    # print('Query 2D embedding shape: ', query_embeddings_2d.shape)
 
     # Plotting the embeddings
-    plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(10, 6))
 
     # Plot database embeddings with text labels
     for i, (x, y) in enumerate(db_embeddings_2d):
@@ -123,6 +123,7 @@ def pca_analysis(db_names, query_names, db_descriptors, query_descriptors):
     plt.ylabel("Principal Component 2")
     plt.legend()
     plt.grid(alpha=0.5)
+    fig.tight_layout()
 
     return plt
 

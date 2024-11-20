@@ -68,10 +68,10 @@ class VPREstimator(BaseEstimator):
             axes = axes.reshape(1, -1)
         for query_id in range(self.predictions.shape[0]):
             axes[query_id, 0].imshow(query_images[query_id])
-            axes[query_id, 0].set_title(f'Q-{query_id}', fontsize=10)
+            axes[query_id, 0].set_title(self.query_names[query_id], fontsize=10)
             for i in range(self.recall_value):
                 axes[query_id, i + 1].imshow(db_images[self.predictions[query_id, i]])
-                axes[query_id, i + 1].set_title(f'DB-{self.predictions[query_id, i]}', fontsize=10)
+                axes[query_id, i + 1].set_title(self.db_names[self.predictions[query_id, i]], fontsize=10)
         fig.tight_layout()
         plt.savefig(self.out_dir / 'vpr_result.png')
 
@@ -116,19 +116,14 @@ class VPREstimator(BaseEstimator):
             descriptor = self.model(image.to(self.device)).detach().cpu().numpy()
             query_descriptors[0, :] = descriptor
 
-        print('DB Descriptor shpae: ', db_descriptors.shape)
-        print('Query Descriptor shpae: ', query_descriptors.shape)
-
         # Calculate recalls
         faiss_index = faiss.IndexFlatL2(self.des_dimension)
         faiss_index.add(db_descriptors)
         _, predictions = faiss_index.search(query_descriptors, len(list_img0_name))
-        print(predictions) # 1 x recall_values
 
         # Calculate the affline combination and do pose interpolation
         a_opt, loss = affine_combination(query_descriptors[0, :], db_descriptors[predictions[0], :])
         est_im_pose = pose_interpolation(to_numpy(list_img0_poses), a_opt)
-        print(a_opt)
         
         ##### Store results for visualization
         self.scene_root = scene_root
@@ -140,5 +135,8 @@ class VPREstimator(BaseEstimator):
 
         ##### Get results
         est_focal = list_img0_intr[0]['K'][0][0].item()
+
+        print('VPR Prediction: \n', predictions) # 1 x recall_values
+        print('Affline Combination: \n', a_opt)
 
         return est_focal, est_im_pose, loss
