@@ -57,7 +57,7 @@ class VPREstimator(BaseEstimator):
         self.model = model.eval().to(device)
         self.recall_value = 5
 
-    def show_reconstruction(self):
+    def save_results(self):
         scene = pca_analysis(self.db_names, self.query_names, self.db_descriptors, self.query_descriptors)        
         scene.savefig(self.out_dir / 'vpr_pca_analysis.png')
 
@@ -69,11 +69,14 @@ class VPREstimator(BaseEstimator):
         for query_id in range(self.predictions.shape[0]):
             axes[query_id, 0].imshow(query_images[query_id])
             axes[query_id, 0].set_title(self.query_names[query_id], fontsize=10)
-            for i in range(self.recall_value):
+            for i in range(min(self.recall_value, self.predictions.shape[1])):
                 axes[query_id, i + 1].imshow(db_images[self.predictions[query_id, i]])
                 axes[query_id, i + 1].set_title(self.db_names[self.predictions[query_id, i]], fontsize=10)
         fig.tight_layout()
         plt.savefig(self.out_dir / 'vpr_result.png')
+
+    def show_reconstruction(self, cam_size=0.2):
+        pass
 
     def load_image(self, path_image, im_size=None):
         transformations = [

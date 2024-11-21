@@ -40,6 +40,9 @@ class Mast3rEstimator(BaseEstimator):
             print("Downloading Master(ViT large)... (takes a while)")
             py3_wget.download_file(url, Mast3rEstimator.model_path)
 
+    def save_results(self):
+        pass
+
     def show_reconstruction(self, cam_size=0.2):
         self.scene.show(cam_size=cam_size)
 
@@ -70,7 +73,7 @@ class Mast3rEstimator(BaseEstimator):
 
         imgs_path = [str(scene_root / img_name) for img_name in list_img0_name] + [str(scene_root / img1_name)]
         resize = est_opts.get('resize', 512)
-        images = load_images(imgs_path, size=resize)
+        images = load_images(imgs_path, size=resize, verbose=self.verbose)
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
 

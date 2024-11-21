@@ -28,7 +28,7 @@ def get_version(pkg):
     major, minor, patch = [int(num) for num in version_num.split(".")]
     return major, minor, patch
 
-# @supress_stdout
+@supress_stdout
 def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048, out_dir='/tmp', *args, **kwargs):
     if 'hloc' in estimator_name:
         from estimator.models import hloc
@@ -122,6 +122,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         return duster.Dust3rEstimator(device, *args, **kwargs)
 
     elif estimator_name in ["master", "mast3r"]:
+        print('get_estimator')
         from estimator.models import master
         return master.Mast3rEstimator(device, *args, **kwargs)
 

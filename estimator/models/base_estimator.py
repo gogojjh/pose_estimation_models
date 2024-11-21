@@ -156,7 +156,7 @@ class BaseEstimator(torch.nn.Module):
                           list_img0_name, img1_name, 
                           list_img0_poses, 
                           list_img0_intr, img1_intr,
-                          est_opts=est_opts)
+                          est_opts)
         if isinstance(est_focal, (int, float)): est_focal = np.array([est_focal])
         return {
             "focal": to_numpy(est_focal),

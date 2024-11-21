@@ -31,3 +31,4 @@ lightglue @ git+https://github.com/cvg/LightGlue
 # Others
 yacs
 py3_wget
+colorama

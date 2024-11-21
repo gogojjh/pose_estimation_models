@@ -116,20 +116,18 @@ class HlocEstimator(BaseEstimator):
 
         self.feature_conf = extract_features.confs[feature_name]
         self.feature_conf['model']['max_keypoints'] = max_num_keypoints
-        print('[Hloc] feature_conf: ', self.feature_conf)
 
         self.matcher_conf = match_features.confs[matcher_name]
-        print('[Hloc] matcher_conf: ', self.matcher_conf)
 
         self.loc_conf = {
             "estimation": {"ransac": {"max_error": 12}},
             "refinement": {"refine_focal_length": True, "refine_extra_params": True},
         }
-        print('[Hloc] loc_conf: ', self.loc_conf)
+        # print('[Hloc] loc_conf: ', self.loc_conf)
 
-        pycolmap.logging.minloglevel = 2
+        pycolmap.logging.minloglevel = 100
        
-    def show_reconstruction(self, cam_size=0.2):
+    def save_results(self):    
         # Visualize 2D points with successful triangulation
         visualization.visualize_sfm_2d(self.model, self.scene_root, color_by="visibility", n=1)
         plt.savefig(self.out_dir / "vis_sfm_2d.png")
@@ -145,19 +143,20 @@ class HlocEstimator(BaseEstimator):
         # Visualize query camera and world coordinate system
         viz_3d.plot_camera_colmap(scene, pose, self.query_camera, 
                                   color="rgba(0,255,0,0.5)", name=self.query_name, fill=True, 
-                                  size=cam_size)
+                                  size=0.2)
         viz_3d.plot_camera_colmap(scene, pycolmap.Image(cam_from_world=pycolmap.Rigid3d()), self.query_camera, 
                                   color="rgba(0,0,255,0.5)", name='world', fill=True, 
-                                  size=cam_size)
+                                  size=0.2)
         # Visualize 2D-3D correspodences
         inl_3d = np.array([self.model.points3D[pid].xyz for pid in np.array(self.log["points3D_ids"])[self.ret["inliers"]]])
         viz_3d.plot_points(scene, inl_3d, color="lime", ps=1, name=self.query_name)
         scene.write_image(self.out_dir / "reconstruction.png")
         for image in self.model.images.values(): print(image)
+        # print('Query camera: ', self.query_camera)
+        self.scene = scene
 
-        print('Query camera: ', self.query_camera)
-
-        # scene.show()
+    def show_reconstruction(self, cam_size=0.2):
+        self.scene.show()
 
     # TODO(gogojjh): this function is not used
     # def recover_metric_pose(self, poses_pred, poses_gt, query_pose):
@@ -264,7 +263,9 @@ class HlocEstimator(BaseEstimator):
         extract_features.main(self.feature_conf, scene_root, image_list=references, feature_path=self.path_features)
         pairs_from_poses.main(colmap_arkit, self.path_sfm_pairs, len(references))
         match_features.main(self.matcher_conf, self.path_sfm_pairs, features=self.path_features, matches=self.path_matches)
-        model = triangulation.main(colmap_sparse, colmap_arkit, scene_root, self.path_sfm_pairs, self.path_features, self.path_matches)
+        # NOTE(gogjjh): this is the bug, that triangulation.main() sometimes cannot work properly
+        # model = triangulation.main(colmap_sparse, colmap_arkit, scene_root, self.path_sfm_pairs, self.path_features, self.path_matches)
+        model = reconstruction.main(self.path_sfm_dir, scene_root, self.path_sfm_pairs, self.path_features, self.path_matches, image_list=references)
         num_med_points3D = np.median(np.array([image.num_points3D for image in model.images.values()]))
         cnt = sum(1 for image in model.images.values() if image.num_points3D > num_med_points3D / 2)
         print('Successful trianglation:', cnt, '/', len(model.images))        
@@ -325,6 +326,9 @@ class HlocEstimator(BaseEstimator):
             model, ret_query, est_focal, est_im_pose, loss = \
                 self.estimate_pose(scene_root, list_img0_name, img1_name)
 
+        if model.num_points3D() < 100:
+            return None, None, None
+        
         ##### Store results for visualization
         self.model = model
         self.scene_root = scene_root
@@ -332,5 +336,4 @@ class HlocEstimator(BaseEstimator):
         self.query_camera = ret_query['query_camera']
         self.ret = ret_query['ret']
         self.log = ret_query['log']
-
         return est_focal, est_im_pose, loss
