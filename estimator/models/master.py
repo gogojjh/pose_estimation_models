@@ -27,7 +27,7 @@ class Mast3rEstimator(BaseEstimator):
 
         self.schedule = 'cosine'
         self.lr = 0.01
-        self.niter = 300
+        self.niter = 100
 
         self.download_weights()
         self.model = AsymmetricMASt3R.from_pretrained(self.model_path).to(device)
@@ -43,8 +43,8 @@ class Mast3rEstimator(BaseEstimator):
     def save_results(self):
         pass
 
-    def show_reconstruction(self, cam_size=0.2):
-        self.scene.show(cam_size=cam_size)
+    def show_reconstruction(self, cam_size=None):
+        self.scene.show() if cam_size is None else self.scene.show(cam_size=cam_size)
 
     def preprocess(self, img):
         _, h, w = img.shape

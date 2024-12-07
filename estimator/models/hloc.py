@@ -24,9 +24,9 @@ from hloc.localize_sfm import QueryLocalizer, pose_from_cluster
 import pycolmap
 import matplotlib.pyplot as plt
 
-# TODO(gogojjh): this function is not used
+# TODO(gogojjh): recover metric pose
+# Package4 for trajectory alignment
 # add_to_path(THIRD_PARTY_DIR.joinpath('CF-3DGS'), insert=0)
-# packages for pose alignment
 # from utils.utils.poses.comp_ate import compute_ATE
 # from utils.utils_poses.ATE.align_utils import alignTrajectory
 # from utils.utils_poses.lie_group_helper import SO3_to_quat, convert3x4_4x4
@@ -35,77 +35,77 @@ import matplotlib.pyplot as plt
 # from evo.tools import plot
 # import copy
 
-# def align_ate_c2b_use_a2b(traj_a, traj_b, traj_c=None, method='sim3'):
-#     """Align c to b using the sim3 from a to b.
-#     :param traj_a:  (N0, 3/4, 4)
-#     :param traj_b:  (N0, 3/4, 4)
-#     :param traj_c:  None or (N1, 3/4, 4)
-#     :return:        (N1, 4,   4)
-#     """
-#     if traj_c is None: traj_c = traj_a.copy()
+def align_ate_c2b_use_a2b(traj_a, traj_b, traj_c=None, method='sim3'):
+    """Align c to b using the sim3 from a to b.
+    :param traj_a:  (N0, 3/4, 4)
+    :param traj_b:  (N0, 3/4, 4)
+    :param traj_c:  None or (N1, 3/4, 4)
+    :return:        (N1, 4,   4)
+    """
+    if traj_c is None: traj_c = traj_a.copy()
 
-#     R_a = traj_a[:, :3, :3]  # (N0, 3, 3)
-#     t_a = traj_a[:, :3, 3]  # (N0, 3)
-#     quat_a = SO3_to_quat(R_a)  # (N0, 4)
+    R_a = traj_a[:, :3, :3]  # (N0, 3, 3)
+    t_a = traj_a[:, :3, 3]  # (N0, 3)
+    quat_a = SO3_to_quat(R_a)  # (N0, 4)
 
-#     R_b = traj_b[:, :3, :3]  # (N0, 3, 3)
-#     t_b = traj_b[:, :3, 3]  # (N0, 3)
-#     quat_b = SO3_to_quat(R_b)  # (N0, 4)
+    R_b = traj_b[:, :3, :3]  # (N0, 3, 3)
+    t_b = traj_b[:, :3, 3]  # (N0, 3)
+    quat_b = SO3_to_quat(R_b)  # (N0, 4)
 
-#     # This function works in quaternion.
-#     # scalar, (3, 3), (3, ) gt = R * s * est + t.
-#     s, R, t = alignTrajectory(t_a, t_b, quat_a, quat_b, method=method)
+    # This function works in quaternion.
+    # scalar, (3, 3), (3, ) gt = R * s * est + t.
+    s, R, t = alignTrajectory(t_a, t_b, quat_a, quat_b, method=method)
 
-#     # reshape tensors
-#     R = R[None, :, :].astype(np.float32)  # (1, 3, 3)
-#     t = t[None, :, None].astype(np.float32)  # (1, 3, 1)
-#     s = float(s)
+    # reshape tensors
+    R = R[None, :, :].astype(np.float32)  # (1, 3, 3)
+    t = t[None, :, None].astype(np.float32)  # (1, 3, 1)
+    s = float(s)
 
-#     R_c = traj_c[:, :3, :3]  # (N1, 3, 3)
-#     t_c = traj_c[:, :3, 3:4]  # (N1, 3, 1)
+    R_c = traj_c[:, :3, :3]  # (N1, 3, 3)
+    t_c = traj_c[:, :3, 3:4]  # (N1, 3, 1)
 
-#     R_c_aligned = R @ R_c  # (N1, 3, 3)
-#     t_c_aligned = s * (R @ t_c) + t  # (N1, 3, 1)
-#     traj_c_aligned = np.concatenate([R_c_aligned, t_c_aligned], axis=2)  # (N1, 3, 4)
+    R_c_aligned = R @ R_c  # (N1, 3, 3)
+    t_c_aligned = s * (R @ t_c) + t  # (N1, 3, 1)
+    traj_c_aligned = np.concatenate([R_c_aligned, t_c_aligned], axis=2)  # (N1, 3, 4)
 
-#     # append the last row
-#     traj_c_aligned = convert3x4_4x4(traj_c_aligned)  # (N1, 4, 4)
+    # append the last row
+    traj_c_aligned = convert3x4_4x4(traj_c_aligned)  # (N1, 4, 4)
 
-#     ret_align = {'s': s, 'R': R, 't': t}
-#     return traj_c_aligned, ret_align  # (N1, 4, 4)
+    ret_align = {'s': s, 'R': R, 't': t}
+    return traj_c_aligned, ret_align  # (N1, 4, 4)
 
-# def plot_pose(ref_poses, est_poses, output_path : Path):
-    # ref_poses = [pose for pose in ref_poses]
-    # if isinstance(est_poses, dict):
-    #     est_poses = [pose for k, pose in est_poses.items()]
-    # else:
-    #     est_poses = [pose for pose in est_poses]
-    # traj_ref = PosePath3D(poses_se3=ref_poses)
-    # traj_est = PosePath3D(poses_se3=est_poses)
-    # traj_est_aligned = copy.deepcopy(traj_est)
-    # traj_est_aligned.align(traj_ref, correct_scale=True,
-    #                        correct_only_scale=False)
+def plot_pose(ref_poses, est_poses, output_path : Path):
+    ref_poses = [pose for pose in ref_poses]
+    if isinstance(est_poses, dict):
+        est_poses = [pose for k, pose in est_poses.items()]
+    else:
+        est_poses = [pose for pose in est_poses]
+    traj_ref = PosePath3D(poses_se3=ref_poses)
+    traj_est = PosePath3D(poses_se3=est_poses)
+    traj_est_aligned = copy.deepcopy(traj_est)
+    traj_est_aligned.align(traj_ref, correct_scale=True,
+                           correct_only_scale=False)
 
-    # fig = plt.figure()
-    # traj_by_label = {
-    #     # "estimate (not aligned)": traj_est,
-    #     "Ours (aligned)": traj_est_aligned,
-    #     "Ground-truth": traj_ref
-    # }
-    # plot_mode = plot.PlotMode.xyz
-    # ax = fig.add_subplot(111, projection="3d")
-    # ax.xaxis.set_tick_params(labelbottom=False)
-    # ax.yaxis.set_tick_params(labelleft=False)
-    # ax.zaxis.set_tick_params(labelleft=False)
-    # colors = ['r', 'b']
-    # styles = ['-', '--']
+    fig = plt.figure()
+    traj_by_label = {
+        # "estimate (not aligned)": traj_est,
+        "Ours (aligned)": traj_est_aligned,
+        "Ground-truth": traj_ref
+    }
+    plot_mode = plot.PlotMode.xyz
+    ax = fig.add_subplot(111, projection="3d")
+    ax.xaxis.set_tick_params(labelbottom=False)
+    ax.yaxis.set_tick_params(labelleft=False)
+    ax.zaxis.set_tick_params(labelleft=False)
+    colors = ['r', 'b']
+    styles = ['-', '--']
 
-    # for idx, (label, traj) in enumerate(traj_by_label.items()):
-    #     plot.traj(ax, plot_mode, traj,
-    #               styles[idx], colors[idx], label)
-    # ax.view_init(elev=10., azim=45)
-    # plt.tight_layout()
-    # fig.savefig(output_path / "vis_aligned_poses.png")
+    for idx, (label, traj) in enumerate(traj_by_label.items()):
+        plot.traj(ax, plot_mode, traj,
+                  styles[idx], colors[idx], label)
+    ax.view_init(elev=10., azim=45)
+    plt.tight_layout()
+    fig.savefig(output_path / "vis_aligned_poses.png")
 
 class HlocEstimator(BaseEstimator):
     def __init__(self, device="cpu", feature_name='disk', matcher_name='disk+lightglue', 
@@ -158,33 +158,31 @@ class HlocEstimator(BaseEstimator):
     def show_reconstruction(self, cam_size=0.2):
         self.scene.show()
 
-    # TODO(gogojjh): this function is not used
-    # def recover_metric_pose(self, poses_pred, poses_gt, query_pose):
-        # ##### Aligning colmap poses with groundtruth poses: scale, rotation, translation
-        # c2ws_est_aligned, ret_align = align_ate_c2b_use_a2b(poses_pred, poses_gt)
-        # ##### Compute ATE        
-        # ate = compute_ATE(poses_gt, poses_pred)
-        # print('ATE before alignment: ', ate)
-        # # for i in range(1, len(poses_pred), 1): print(poses_pred[i, :3, 3].T, poses_gt[i, :3, 3].T)
-        # ate = compute_ATE(poses_gt, c2ws_est_aligned)
-        # print('ATE after alignment: ', ate)
-        # for i in range(1, len(c2ws_est_aligned), 1): print(c2ws_est_aligned[i, :3, 3].T, poses_gt[i, :3, 3].T)
+    def recover_metric_pose(self, poses_pred, poses_gt, query_pose):
+        ##### Aligning colmap poses with groundtruth poses: scale, rotation, translation
+        c2ws_est_aligned, ret_align = align_ate_c2b_use_a2b(poses_pred, poses_gt)
+        ##### Compute ATE        
+        ate = compute_ATE(poses_gt, poses_pred)
+        print('ATE before alignment: ', ate)
+        # for i in range(1, len(poses_pred), 1): print(poses_pred[i, :3, 3].T, poses_gt[i, :3, 3].T)
+        ate = compute_ATE(poses_gt, c2ws_est_aligned)
+        print('ATE after alignment: ', ate)
+        for i in range(1, len(c2ws_est_aligned), 1): print(c2ws_est_aligned[i, :3, 3].T, poses_gt[i, :3, 3].T)
         
-        # ##### Recover the metric pose of the query image
-        # s, R, t = ret_align['s'], ret_align['R'], ret_align['t']
-        # R_c = query_pose[:3, :3]  # (N1, 3, 3)
-        # t_c = query_pose[:3, 3:4]  # (N1, 3, 1)
-        # R_c_aligned = R @ R_c  # (N1, 3, 3)
-        # t_c_aligned = s * (R @ t_c) + t  # (N1, 3, 1)        
-        # metric_query_pose = np.eye(4)
-        # metric_query_pose[:3,  :3] = R_c_aligned
-        # metric_query_pose[:3, 3:4] = t_c_aligned
+        ##### Recover the metric pose of the query image
+        s, R, t = ret_align['s'], ret_align['R'], ret_align['t']
+        R_c = query_pose[:3, :3]  # (N1, 3, 3)
+        t_c = query_pose[:3, 3:4]  # (N1, 3, 1)
+        R_c_aligned = R @ R_c  # (N1, 3, 3)
+        t_c_aligned = s * (R @ t_c) + t  # (N1, 3, 1)        
+        metric_query_pose = np.eye(4)
+        metric_query_pose[:3,  :3] = R_c_aligned
+        metric_query_pose[:3, 3:4] = t_c_aligned
 
-        # ##### Visualize the alignment
-        # plot_pose(poses_gt, c2ws_est_aligned, self.scene_root)
+        ##### Visualize the alignment
+        plot_pose(poses_gt, c2ws_est_aligned, self.scene_root)
 
-        # return metric_query_pose
-        # pass
+        return metric_query_pose
 
     def feature_process(self, scene_root, references, query):
         ##### Extract features, match features, and triangulation of reference images

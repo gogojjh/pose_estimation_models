@@ -22,8 +22,17 @@ if not hasattr(sys, "ps1"):
 
 ##### Load images
 # Matterport3d
-# N_ref_image = 15
+# N_ref_image = 2
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
+# K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
+# im_size = np.array([640, 360])
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': True,
+#     'resize': 512,
+# }
+
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_multisession_eval/s00000/out_map0/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([640, 360])
 # est_opts = {
@@ -43,15 +52,25 @@ if not hasattr(sys, "ps1"):
 #     'resize': 512,
 # }
 
-N_ref_image = 5
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/')
-K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
-im_size = np.array([1280, 720])
+# ucl_campus_meta_glass
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus/s00000/out_map0/')
+K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
+im_size = np.array([1024, 576])
 est_opts = {
     'known_extrinsics': True,
     'known_intrinsics': True,
     'resize': 512,
 }
+
+# N_ref_image = 5
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/')
+# K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
+# im_size = np.array([1280, 720])
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': True,
+#     'resize': 512,
+# }
 
 # 360Loc
 # N_ref_image = 12
@@ -79,14 +98,16 @@ def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
     for i in range(1):
-        list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(N_ref_image)]
-        img1_name = 'seq0/frame_00000.jpg'
+        # list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(N_ref_image)]
+        # img1_name = 'seq0/frame_00000.jpg'
+
+        list_img0_name = ['seq/000008.color.jpg', 'seq/000009.color.jpg']
+        img1_name = '../out_map1/seq/000000.color.jpg'
 
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
             for line in f.readlines():
-                if '#' in line:
-                    continue
+                if '#' in line: continue
                 line = line.strip().split(' ')
                 img_name = line[0]
                 qt = np.array(list(map(float, line[1:])))
@@ -101,13 +122,12 @@ def main(args):
             pose = np.eye(4)
             pose[:3, :] = poses_load[name].matrix()
             list_img0_poses.append(torch.from_numpy(np.linalg.inv(pose)))
-        pose = np.eye(4)
-        pose[:3, :] = poses_load[img1_name].matrix()
 
         list_img0_intr = [{'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)} for _ in list_img0_name]
         img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
         start_time = time.time()
+        print(list_img0_poses)
         result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
         print(f"Processing time: {time.time() - start_time:.2f}s")
         print('Focal length: ', result['focal'][0])
