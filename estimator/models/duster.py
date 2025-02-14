@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 import os
+import torch
 import torchvision.transforms as tfm
 import py3_wget
 import numpy as np
@@ -27,7 +28,7 @@ class Dust3rEstimator(BaseEstimator):
 
         self.schedule = 'cosine'
         self.lr = 0.01
-        self.niter = 300
+        self.niter = 301
 
         self.download_weights()
         self.model = AsymmetricCroCo3DStereo.from_pretrained(self.model_path).to(device)
@@ -54,6 +55,15 @@ class Dust3rEstimator(BaseEstimator):
         img = self.normalize(img).unsqueeze(0)
         return img, orig_shape
 
+    def get_similarity(self, option='mean'):
+        if option == 'mean':
+            edge_scores = {e: float(self.scene.conf_i[e].mean() * self.scene.conf_j[e].mean()) 
+                           for e in self.scene.str_edges}
+        elif option == 'median':
+            edge_scores = {e: float(self.scene.conf_i[e].median() * self.scene.conf_j[e].median()) 
+                           for e in self.scene.str_edges}
+        return edge_scores
+
     def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
         """
         Performs the forward pass of the pose estimation model.
@@ -71,24 +81,75 @@ class Dust3rEstimator(BaseEstimator):
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
 
-        imgs_path = [str(scene_root / img_name) for img_name in list_img0_name] + [str(scene_root / img1_name)]
         resize = est_opts.get('resize', 512)
+        imgs_path = [str(scene_root / img_name) for img_name in list_img0_name] + [str(scene_root / img1_name)]
         images = load_images(imgs_path, size=resize, verbose=self.verbose)
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
+        assert len(imgs_path) == len(images)
+
+        ############## 
+        # At this stage, you have the raw dust3r predictions
+        # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
+        #  -> because we symmetrize we have (im1, im2) and (im2, im1) pairs
+        # in each view you have:
+        # an integer image identifier: view1['idx'] and view2['idx']
+        # the img: view1['img'] and view2['img']
+        # the image shape: view1['true_shape'] and view2['true_shape']
+        # an instance string output by the dataloader: view1['instance'] and view2['instance']
+        # pred1 and pred2 contains the confidence values: pred1['conf'] and pred2['conf']
+        # pred1 contains 3D points for view1['img'] in view1['img'] space: pred1['pts3d']
+        # pred2 contains 3D points for view2['img'] in view1['img'] space: pred2['pts3d_in_other_view']
+        # next we'll use the global_aligner to align the predictions
+        # depending on your task, you may be fine with the raw output and not need it
+        # with only two input images, you could use GlobalAlignerMode.PairViewer: it would just convert the output
+        # if using GlobalAlignerMode.PairViewer, no need to run compute_global_alignment
+        ############## 
+        # Summary: Keys of output, view1, pred1, view2, pred2
+        #   output['view1', 'view2', 'pred1', 'pred2', 'loss'])
+        #   view1['img', 'true_shape', 'idx', 'instance'])
+        #   view2['img', 'true_shape', 'idx', 'instance'])
+        #   pred1['pts3d', 'conf', 'desc', 'desc_conf'])
+        #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view'])
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
 
         ##### GlobalAlignerMode.PointCloudOptimizer
-        scene = global_aligner(output, device=self.device, mode=GlobalAlignerMode.ModularPointCloudOptimizer, verbose=self.verbose)
+        scene = global_aligner(
+            output, 
+            device=self.device, 
+            mode=GlobalAlignerMode.ModularPointCloudOptimizer, 
+            verbose=self.verbose,
+            conf='log'
+        )
+
         if est_opts['known_extrinsics']:
             known_poses = [pose for pose in list_img0_poses] + [np.eye(4)]
             scene.preset_pose(known_poses=known_poses, pose_msk=[True] * len(list_img0_poses) + [False])
+            print(known_poses)
             
-        # TODO(gogojjh):
-        # if list_img0_K is not None:
-        #     scene.preset_intrinsics(list_img0_K + [img1_K])
-        
+        if est_opts['known_intrinsics']:
+            list_img_intr = list_img0_intr + [img1_intr]
+            resize_list_img_K = []
+            for idx, image in enumerate(images):
+                ori_K = list_img_intr[idx]['K']
+                ori_im_size = list_img_intr[idx]['im_size']                    # HxW
+                new_im_size = torch.from_numpy(image['true_shape']).squeeze(0) # HxW
+                scale_h = new_im_size[0] / ori_im_size[0]
+                scale_w = new_im_size[1] / ori_im_size[1]
+                new_K = ori_K.clone()
+                new_K[0, 0] *= scale_w  # Focal length X
+                new_K[1, 1] *= scale_h  # Focal length Y
+                new_K[0, 2]  = new_K[0, 2] * scale_w  # Principal point X
+                new_K[1, 2]  = new_K[1, 2] * scale_h  # Principal point Y
+                resize_list_img_K.append(new_K)
+            scene.preset_intrinsics(resize_list_img_K)
+
         ##### Perform optimization
-        loss = scene.compute_global_alignment(init="mst", niter=self.niter, schedule=self.schedule, lr=self.lr)
+        loss = scene.compute_global_alignment(
+            init="mst", 
+            niter=self.niter, 
+            schedule=self.schedule, 
+            lr=self.lr
+        )
 
         ##### Get results
         focals, im_poses = scene.get_focals(), scene.get_im_poses()
