@@ -22,13 +22,24 @@ if not hasattr(sys, "ps1"):
 
 ##### Load images
 # Matterport3d
-# N_ref_image = 2
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_free_eval/test/s00000/')
+N_ref_image = 3
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/matterport3d/map_free_eval/test/s00000/')
+K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
+im_size = np.array([360, 640]) # HxW
+est_opts = {
+    'known_extrinsics': True,
+    'known_intrinsics': True,
+    'resize': 512,
+}
+
+# Replica
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/replica/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([640, 360])
 # est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': True,
+#     'known_extrinsics': False,
+#     'known_intrinsics': False,
 #     'resize': 512,
 # }
 
@@ -53,14 +64,14 @@ if not hasattr(sys, "ps1"):
 # }
 
 # ucl_campus_meta_glass
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus/s00000/out_map0/')
-K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
-im_size = np.array([1024, 576])
-est_opts = {
-    'known_extrinsics': True,
-    'known_intrinsics': True,
-    'resize': 512,
-}
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus/s00000/out_map0/')
+# K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
+# im_size = np.array([1024, 576])
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': True,
+#     'resize': 512,
+# }
 
 # N_ref_image = 5
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/')
@@ -98,11 +109,8 @@ def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
     for i in range(1):
-        # list_img0_name = [f'seq1/frame_{index:05}.jpg' for index in range(N_ref_image)]
-        # img1_name = 'seq0/frame_00000.jpg'
-
-        list_img0_name = ['seq/000008.color.jpg', 'seq/000009.color.jpg']
-        img1_name = '../out_map1/seq/000000.color.jpg'
+        list_img0_name = ['seq0/frame_00000.jpg', 'seq1/frame_00003.jpg']
+        img1_name = 'seq1/frame_00005.jpg'
 
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
@@ -115,7 +123,7 @@ def main(args):
                 pose.translation = qt[4:]
                 pose.rotation = pycolmap.Rotation3d(np.roll(qt[:4], -1))
                 poses_load[img_name] = pose
-        
+
         # Pose from world to camera
         list_img0_poses = []
         for name in list_img0_name:
@@ -127,14 +135,15 @@ def main(args):
         img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
         start_time = time.time()
-        print(list_img0_poses)
         result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
+        edge_scores = estimator.get_similarity()
         print(f"Processing time: {time.time() - start_time:.2f}s")
-        print('Focal length: ', result['focal'][0])
-        print('Estimated pose: ', result['im_pose'][:3, 3:4].T) # Pose from world to camera
-        print('Loss:', result['loss'])
-
-        estimator.show_reconstruction()
+        print(f"Edge score: {edge_scores}")
+        print(f"Focal length: {result['focal'][0]:.03f}")
+        print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
+        print(f"Loss: {result['loss']:.03f}")
+        
+        estimator.show_reconstruction(cam_size=0.2)
 
 def parse_args():
     parser = argparse.ArgumentParser(
