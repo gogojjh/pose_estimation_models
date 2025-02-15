@@ -55,7 +55,7 @@ class BaseEstimator(torch.nn.Module):
         img = tfm.functional.rotate(img, rot_angle)
         tensor_size2 = img.shape
 
-        print(f" - adding {path} with resolution {tensor_size1} --> {tensor_size2}")
+        # print(f" - adding {path} with resolution {tensor_size1} --> {tensor_size2}")
         return img
 
     def rescale_coords(
@@ -137,8 +137,81 @@ class BaseEstimator(torch.nn.Module):
             img, (H,W) (Tuple[torch.Tensor, Tuple[int, int]]): img after preprocessing, original image shape
         """
         _, h, w = img.shape
+
         orig_shape = h, w
+        
         return img, orig_shape
+
+    # TODO(gogojjh): return edge scores for general pose estimator
+    def get_similarity(self):
+        """Get edge scores for the scene.
+
+        Returns:
+            dict: edge scores
+        """
+        return {}
+
+    @torch.inference_mode()
+    def get_matched_kpts(
+        self, 
+        scene_root: Path, 
+        img0: Union[torch.Tensor, str, Path], 
+        img1: Union[torch.Tensor, str, Path]
+    ) -> dict:
+        """
+        All sub-classes implement the following interface:
+
+        Parameters
+        ----------
+        scene_root : Path
+        img0_name  : str
+        img1_name  : str
+
+        Returns
+        -------
+        dict with keys: ['num_inliers', 'H', 'all_kpts0', 'all_kpts1', 'all_desc0', 'all_desc1',
+                         'matched_kpts0', 'matched_kpts1', 'inlier_kpts0', 'inlier_kpts1']
+
+        num_inliers : int, number of inliers after RANSAC, i.e. len(inlier_kpts0)
+        H : np.array (3 x 3), the homography matrix to map matched_kpts0 to matched_kpts1
+        all_kpts0 : np.ndarray (N0 x 2), all detected keypoints from img0
+        all_kpts1 : np.ndarray (N1 x 2), all detected keypoints from img1
+        all_desc0 : np.ndarray (N0 x D), all descriptors from img0
+        all_desc1 : np.ndarray (N1 x D), all descriptors from img1
+        matched_kpts0 : np.ndarray (N2 x 2), keypoints from img0 that match matched_kpts1 (pre-RANSAC)
+        matched_kpts1 : np.ndarray (N2 x 2), keypoints from img1 that match matched_kpts0 (pre-RANSAC)
+        inlier_kpts0 : np.ndarray (N3 x 2), filtered matched_kpts0 that fit the H model (post-RANSAC matched_kpts)
+        inlier_kpts1 : np.ndarray (N3 x 2), filtered matched_kpts1 that fit the H model (post-RANSAC matched_kpts)
+        """
+        # Take as input a pair of images (not a batch)
+        if isinstance(img0, (str, Path)):
+            img0 = BaseEstimator.load_image(scene_root / img0)
+        if isinstance(img1, (str, Path)):
+            img1 = BaseEstimator.load_image(scene_root / img1)
+
+        assert isinstance(img0, torch.Tensor)
+        assert isinstance(img1, torch.Tensor)
+
+        img0 = img0.to(self.device)
+        img1 = img1.to(self.device)
+
+        matched_kpts0, matched_kpts1, all_kpts0, all_kpts1, all_desc0, all_desc1 = self._get_matched_kpts(img0, img1)
+
+        matched_kpts0, matched_kpts1 = to_numpy(matched_kpts0), to_numpy(matched_kpts1)
+        H, inlier_kpts0, inlier_kpts1 = self.process_matches(matched_kpts0, matched_kpts1)
+
+        return {
+            "num_inliers": len(inlier_kpts0),
+            "H": H,
+            "all_kpts0": to_numpy(all_kpts0),
+            "all_kpts1": to_numpy(all_kpts1),
+            "all_desc0": to_numpy(all_desc0),
+            "all_desc1": to_numpy(all_desc1),
+            "matched_kpts0": matched_kpts0,
+            "matched_kpts1": matched_kpts1,
+            "inlier_kpts0": inlier_kpts0,
+            "inlier_kpts1": inlier_kpts1,
+        }
 
     def forward(
         self,
@@ -166,36 +239,3 @@ class BaseEstimator(torch.nn.Module):
 
     def show_reconstruction(self):
         pass
-
-    # def extract(self, img: str | Path | torch.Tensor) -> dict:
-    #     # Take as input a pair of images (not a batch)
-    #     if isinstance(img, (str, Path)):
-    #         img = BaseEstimator.load_image(img)
-
-    #     assert isinstance(img, torch.Tensor)
-
-    #     img = img.to(self.device)
-
-    #     matched_kpts0, _, all_kpts0, _, all_desc0, _ = self._forward(img, img)
-
-    #     kpts = matched_kpts0 if isinstance(self, EnsembleMatcher) else all_kpts0
-
-    #     return {"all_kpts0": to_numpy(kpts), "all_desc0": to_numpy(all_desc0)}
-
-
-# class EnsembleMatcher(BaseEstimator):
-#     def __init__(self, matcher_names=[], device="cpu", **kwargs):
-#         from matching import get_matcher
-
-#         super().__init__(device, **kwargs)
-
-#         self.matchers = [get_matcher(name, device=device, **kwargs) for name in matcher_names]
-
-#     def _forward(self, img0: torch.Tensor, img1: torch.Tensor) -> Tuple[np.ndarray, np.ndarray, None, None, None, None]:
-#         all_matched_kpts0, all_matched_kpts1 = [], []
-#         for matcher in self.matchers:
-#             matched_kpts0, matched_kpts1, _, _, _, _ = matcher._forward(img0, img1)
-#             all_matched_kpts0.append(to_numpy(matched_kpts0))
-#             all_matched_kpts1.append(to_numpy(matched_kpts1))
-#         all_matched_kpts0, all_matched_kpts1 = np.concatenate(all_matched_kpts0), np.concatenate(all_matched_kpts1)
-#         return all_matched_kpts0, all_matched_kpts1, None, None, None, None
