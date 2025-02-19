@@ -20,6 +20,9 @@ available_models = [
     "vpr_cosplace_resnet18_512",
     "vpr_netvlad_resnet18_4096",
     "duster",
+    "duster_calib",
+    "duster_lora",
+    "duster_calib_lora",
     "master",
 ]
 
@@ -81,7 +84,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
 
         return hloc.HlocEstimator(device, feature_name, matcher_name, max_num_keypoints, out_dir, *args, **kwargs)
 
-    if 'vpr' in estimator_name:
+    elif 'vpr' in estimator_name:
         method_name = estimator_name.split('_')[1]
         if method_name != 'netvlad' and \
            method_name != 'convap' and method_name != 'maxvpr' and \
@@ -117,14 +120,32 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         from estimator.models import vpr
         return vpr.VPREstimator(device, method_name, backbone_name, des_dimension, out_dir, *args, **kwargs)
 
-    if estimator_name in ["duster", "dust3r"]:
-        from estimator.models import duster
-        return duster.Dust3rEstimator(device, *args, **kwargs)
+    elif 'duster' in estimator_name or 'dust3r' in estimator_name:
+        # duster, duster_calib, duster_calib_lora
+        use_calib = '_calib' in estimator_name
+        use_lora = '_lora' in estimator_name
+        if not (estimator_name == 'duster' or estimator_name == 'dust3r') and \
+           not ('_calib' in estimator_name or '_lora' in estimator_name):
+            raise RuntimeError(
+                f"Estimator {estimator_name} for duster not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
+            )
 
-    elif estimator_name in ["master", "mast3r"]:
-        print('get_estimator')
+        from estimator.models import duster
+        return duster.Dust3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
+
+    if 'master' in estimator_name or 'mast3r' in estimator_name:
+        # master, master_calib, master_calib_lora
+        use_calib = '_calib' in estimator_name
+        use_lora = '_lora' in estimator_name
+        if not (estimator_name == 'master' or estimator_name == 'mast3r') and \
+           not ('_calib' in estimator_name or '_lora' in estimator_name):
+            raise RuntimeError(
+                f"Estimator {estimator_name} for master not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
+            )
+
         from estimator.models import master
-        return master.Mast3rEstimator(device, *args, **kwargs)
+        # return duster.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
+        return duster.Mast3rEstimator(device, *args, **kwargs)
 
     else:
         raise RuntimeError(

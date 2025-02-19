@@ -5,6 +5,7 @@ import torch
 import torchvision.transforms as tfm
 import py3_wget
 import numpy as np
+import matplotlib.pyplot as plt
 
 from estimator.utils import add_to_path, resize_to_divisible
 from estimator import WEIGHTS_DIR, THIRD_PARTY_DIR, BaseEstimator
@@ -21,17 +22,63 @@ class Dust3rEstimator(BaseEstimator):
 	model_path = WEIGHTS_DIR.joinpath("duster_vit_large.pth")
 	vit_patch_size = 16
 
-	def __init__(self, device="cpu", *args, **kwargs):
+	def __init__(self, device="cpu", use_calib=False, use_lora=False, *args, **kwargs):
 		super().__init__(device, **kwargs)
 		self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 		self.verbose = False
 
 		self.schedule = 'cosine'
 		self.lr = 0.01
-		self.niter = 301
+		self.niter = 300
 
 		self.download_weights()
-		self.model = AsymmetricCroCo3DStereo.from_pretrained(self.model_path).to(device)
+		self.model = AsymmetricCroCo3DStereo.from_pretrained(self.model_path)
+
+		# Parameters for confidence map calibration
+		if use_calib:
+			self.calib_params = dict(mu=1.0, conf_thre=0.5, pseudo_gt_thre=1.5)
+		else:
+			self.calib_params = None
+
+		# Inject lora weights on the original model
+		if use_lora:
+			from dust3r.lora import LoraLayer, inject_lora
+			# NOTE(gogojjh): change the path of lora
+			lora_weight_path = WEIGHTS_DIR.joinpath("test_lora.pt")
+
+			# Traverse all lora layer
+			for name,layer in self.model.named_modules():
+				name_cols = name.split('.')
+				filter_names = ['qkv']
+				if any(n in name_cols for n in filter_names) and \
+				   isinstance(layer, torch.nn.Linear):
+					inject_lora(self.model, name, layer)
+			
+			# Load LoRA weights
+			try:
+				restore_lora_state = torch.load(self.lora_weight_path)
+				self.model.load_state_dict(restore_lora_state, strict=False)
+				num_lora_param = sum(param.numel() for param in restore_lora_state.values())
+				print(f'Number of LoRA Parameters: {num_lora_param}')
+			except:
+				pass 
+
+			# Add LoRA weights into the model weight as the linear layer
+			for name, layer in self.model.named_modules():
+				name_cols = name.split('.')
+				if isinstance(layer, LoraLayer):
+					children = name_cols[:-1]
+					cur_layer = self.model 
+					for child in children:
+						cur_layer = getattr(cur_layer,child)  
+					lora_weight = (layer.lora_a @ layer.lora_b) * layer.alpha / layer.r
+        			layer.raw_linear.weight.data += lora_weight.T
+					# Replace the LoRA layer with the updated linear layer
+					setattr(cur_layer, name_cols[-1], layer.raw_linear)
+		
+		num_model_param = sum(p.numel() for p in self.model.parameters())
+		print(f'Number of Model Parameters: {num_model_param}')
+		self.model = self.model.to(device)
 
 	@staticmethod
 	def download_weights():
@@ -41,8 +88,15 @@ class Dust3rEstimator(BaseEstimator):
 			print("Downloading Dust3r(ViT large)... (takes a while)")
 			py3_wget.download_file(url, Dust3rEstimator.model_path)
 
-	def save_results(self):
-		pass
+	def save_results(self, save_log, scene_root, list_depth_img_name, indice):
+		fig0 = self.visualize_weights_errors()
+		fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)
+		if indice % 5 == 0:
+			fig0.savefig(save_log / f"img_weight_error_{indice}.jpg")
+			fig1.savefig(save_log / f"depth_alignment_{indice}.jpg")
+		plt.close(fig0)
+		plt.close(fig1)
+		return avg_depth_error, corr_score
 
 	def show_reconstruction(self, cam_size=0.2):
 		self.scene.show(cam_size=cam_size)
@@ -113,14 +167,13 @@ class Dust3rEstimator(BaseEstimator):
 		output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
 
 		##### GlobalAlignerMode.PointCloudOptimizer
-		calib_params = dict(mu=1.0, conf_thre=0.5, pseudo_gt_thre=1.5)
 		scene = global_aligner(
 			output, 
 			device=self.device, 
 			mode=GlobalAlignerMode.ModularPointCloudOptimizer, 
 			verbose=self.verbose,
 			conf='log',
-			calib_params=calib_params
+			calib_params=self.calib_params
 		)
 		self.scene = scene
 
@@ -133,10 +186,10 @@ class Dust3rEstimator(BaseEstimator):
 			resize_list_img_K = []
 			for idx, image in enumerate(images):
 				ori_K = list_img_intr[idx]['K']
-				ori_im_size = list_img_intr[idx]['im_size']                    # HxW
+				ori_im_size = list_img_intr[idx]['im_size']                    # WxH
 				new_im_size = torch.from_numpy(image['true_shape']).squeeze(0) # HxW
-				scale_h = new_im_size[0] / ori_im_size[0]
-				scale_w = new_im_size[1] / ori_im_size[1]
+				scale_w = new_im_size[0] / ori_im_size[1]
+				scale_h = new_im_size[1] / ori_im_size[0]
 				new_K = ori_K.clone()
 				new_K[0, 0] *= scale_w  # Focal length X
 				new_K[1, 1] *= scale_h  # Focal length Y
@@ -146,19 +199,11 @@ class Dust3rEstimator(BaseEstimator):
 			scene.preset_intrinsics(resize_list_img_K)
 
 		##### Perform optimization
-		self.visualize_weights_errors(
-			calib_params,
-			f"/Titan/code/robohike_ws/src/pose_estimation_models/outputs_duster/matterport3d_img_weights_errors_{0}.jpg"
-		)
 		loss = scene.compute_global_alignment(
 			init="mst", 
 			niter=self.niter, 
 			schedule=self.schedule, 
 			lr=self.lr
-		)
-		self.visualize_weights_errors(
-			calib_params,
-			f"/Titan/code/robohike_ws/src/pose_estimation_models/outputs_duster/matterport3d_img_weights_errors_{self.niter}.jpg"
 		)
 
 		##### Get results
@@ -168,35 +213,37 @@ class Dust3rEstimator(BaseEstimator):
 
 	def evaluate_correlation(self, values1, values2):
 		from scipy import stats
-
 		valid_mask = np.isfinite(values1) & np.isfinite(values2)
 		valid_values1 = values1[valid_mask]
 		valid_values2 = values2[valid_mask]
-
 		# Spearman Rank Correlation (measures monotonic relationship)
 		# -1 = perfect inverse relationship
 		spearman_corr, spearman_p = stats.spearmanr(valid_values2, valid_values1)
-		print(f"Spearman Correlation: {spearman_corr:.3f}")
+		# print(f"Spearman Correlation: {spearman_corr:.3f}")
+		return spearman_corr
 
 	@torch.no_grad()
-	def evaluate_depth_result(self, scene_root, list_depth_img_name, save_img_path):
+	def visualize_depth_result(self, scene_root, list_depth_img_name):
 		import numpy as np
 		from PIL import Image
 		from matplotlib.gridspec import GridSpec
-		import matplotlib.pyplot as plt
 		import torch
 
 		depth_scale = 1000.0
+		max_depth = 15.0
+
 		gt_depth_imgs = []
 		imgs_path = [str(scene_root / img_name) for img_name in list_depth_img_name]		
 		for path in imgs_path:
 			with Image.open(path) as img:
 				gt_depth = np.array(img).astype(np.float32) / depth_scale  # mm -> m
-				gt_depth[gt_depth > 13.5] = 0.0
+				gt_depth[gt_depth > max_depth] = 0.0
 			gt_depth_imgs.append(gt_depth)
 
-		# Align depth map
 		pred_depth_imgs = self.scene.get_depthmaps()
+		assert len(gt_depth_imgs) == len(pred_depth_imgs)
+
+		# Align depth map
 		aligned_depths, scale_factors, error_maps, weight_maps, conf_maps = [], [], [], [], []
 		for idx, (gt_depth, pred_depth) in enumerate(zip(gt_depth_imgs, pred_depth_imgs)):
 			pred_depth_np = pred_depth.cpu().numpy() if torch.is_tensor(pred_depth) else pred_depth
@@ -284,41 +331,41 @@ class Dust3rEstimator(BaseEstimator):
 		all_errors = np.concatenate([m.flatten() for m in error_maps])
 		all_weights = np.concatenate([m.flatten() for m in weight_maps])
 		all_confs = np.concatenate([m.flatten() for m in conf_maps])
-		print(f'Size of error items: {len(all_errors)}')
+		# print(f'Size of error items: {len(all_errors)}')
 		
-		print('Evaluate Relation: errors - raw_conf')
-		self.evaluate_correlation(all_confs, all_errors)
-		print('Evaluate Relation: errors - calibrated_conf')
-		self.evaluate_correlation(all_weights, all_errors)
+		cor0 = self.evaluate_correlation(all_confs, all_errors)
+		print(f'Evaluate Relation: errors - raw_conf - Spearman Correlation: {cor0:.5f}')
+		cor1 = self.evaluate_correlation(all_weights, all_errors)
+		print(f'Evaluate Relation: errors - calibrated_conf - Spearman Correlation: {cor1:.5f}')
 
 		ax = fig.add_subplot(gs[num_imgs, :2])  # Span all columns in row `num_imgs + 1`
 		ax.plot(all_confs, all_errors, '.', markersize=3)
 		ax.set_xlabel('Raw Confidence')
 		ax.set_ylabel('Depth Errors')
-		ax.set_title('Error vs. Raw Confidence')
+		ax.set_title(f'Error vs. Raw Confidence {cor0:.5f}')
 
 		ax = fig.add_subplot(gs[num_imgs, 2:4])  # Span all columns in row `num_imgs`
 		ax.plot(all_weights, all_errors, '.', markersize=3)
 		ax.set_xlabel('Calibrated Confidence')
 		ax.set_ylabel('Depth Errors')
-		ax.set_title('Error vs. Calibrated Confidence')
+		ax.set_title(f'Error vs. Calibrated Confidence {cor1:.5f}')
 
 		plt.tight_layout()
-		plt.savefig(save_img_path)
+		return fig, np.mean(all_errors), cor1
 			
 	@torch.no_grad()
-	def visualize_weights_errors(self, calib_params, save_img_path):
-		import matplotlib.pyplot as plt
-		from dust3r.utils.geometry import inv, geotrf
+	def visualize_weights_errors(self):
+		from dust3r.utils.geometry import geotrf
 		from dust3r.utils.device import to_numpy
 
+		if self.calib_params is not None:
+			mu = self.calib_params['mu']
+			pseudo_gt_thre = self.calib_params['pseudo_gt_thre']
+		else:
+			mu, pseudo_gt_thre = 1.0, 1.5			
+		max_error, max_conf = 0.125, 2.8
+
 		edge_str_key = f"{0}_{1}"
-
-		mu = calib_params['mu']
-		pseudo_gt_thre = calib_params['pseudo_gt_thre']
-		max_error = 0.125
-		max_conf = 2.8
-
 		i, j = map(int, edge_str_key.split('_')) # default: 0, 1
 		pw_poses = self.scene.get_pw_poses()  # cam-to-world
 		pw_adapt = self.scene.get_adaptors()
@@ -436,5 +483,4 @@ class Dust3rEstimator(BaseEstimator):
 		axes[1, 6].set_ylim(-0.01, max_error)			
 
 		plt.tight_layout()
-		plt.savefig(save_img_path)
-		plt.close()
+		return fig

@@ -25,7 +25,7 @@ if not hasattr(sys, "ps1"):
 N_ref_image = 3
 scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/matterport3d/map_free_eval/test/s00000/')
 K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
-im_size = np.array([360, 640]) # HxW
+im_size = np.array([640, 360]) # WxH
 est_opts = {
     'known_extrinsics': True,
     'known_intrinsics': True,
@@ -36,7 +36,7 @@ est_opts = {
 # N_ref_image = 3
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/replica/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
-# im_size = np.array([640, 360])
+# im_size = np.array([360, 640])
 # est_opts = {
 #     'known_extrinsics': False,
 #     'known_intrinsics': False,
@@ -45,7 +45,7 @@ est_opts = {
 
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_multisession_eval/s00000/out_map0/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
-# im_size = np.array([640, 360])
+# im_size = np.array([360, 640])
 # est_opts = {
 #     'known_extrinsics': True,
 #     'known_intrinsics': True,
@@ -53,10 +53,10 @@ est_opts = {
 # }
 
 # ucl_campus
-# N_ref_image = 20
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/ucl_campus/map_free_eval/test/s00008/')
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus/map_free_eval/test/s00005/')
 # K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
-# im_size = np.array([960, 540])
+# im_size = np.array([540, 960]) # HxW
 # est_opts = {
 #     'known_extrinsics': True,
 #     'known_intrinsics': True,
@@ -66,17 +66,18 @@ est_opts = {
 # ucl_campus_meta_glass
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus/s00000/out_map0/')
 # K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
-# im_size = np.array([1024, 576])
+# im_size = np.array([576, 1024])
 # est_opts = {
 #     'known_extrinsics': True,
 #     'known_intrinsics': True,
 #     'resize': 512,
 # }
 
-# N_ref_image = 5
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/hkustgz_campus/map_free_eval/test/s00000/')
+# hkustgz_campus
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test/s00005/')
 # K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
-# im_size = np.array([1280, 720])
+# im_size = np.array([720, 1280])
 # est_opts = {
 #     'known_extrinsics': True,
 #     'known_intrinsics': True,
@@ -87,7 +88,7 @@ est_opts = {
 # N_ref_image = 12
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/360loc/map_free_eval/test/s00000_test/')
 # K = np.array([[1055.911, 0.0, 939.453], [0.0, 1052.383, 603.812], [0.0, 0.0, 1.0]])
-# im_size = np.array([1920, 1200])
+# im_size = np.array([1200, 1920])
 # est_opts = {
 #     'known_extrinsics': False,
 #     'known_intrinsics': False,
@@ -98,7 +99,7 @@ est_opts = {
 # N_ref_image = 3
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/wildscene/map_free_eval/test/s00000_test/')
 # K = np.array([[1322.75469666, 0.0, 1014.8117275], [0.0, 1321.88964261, 752.801443314], [0.0, 0.0, 1.0]])
-# im_size = np.array([2016, 1512])
+# im_size = np.array([1512, 2016])
 # est_opts = {
 #     'known_extrinsics': False,
 #     'known_intrinsics': False,
@@ -108,9 +109,10 @@ est_opts = {
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
+    estimator.verbose = True
     for i in range(1):
-        list_img0_name = ['seq0/frame_00000.jpg', 'seq1/frame_00003.jpg']
-        img1_name = 'seq1/frame_00005.jpg'
+        list_img0_name = ['seq0/frame_00000.jpg', 'seq1/frame_00005.jpg']
+        img1_name = 'seq1/frame_00009.jpg'
 
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
@@ -143,6 +145,10 @@ def main(args):
         print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
         print(f"Loss: {result['loss']:.03f}")
         
+        list_depth_img_name = ['seq0/frame_00000.zed.png', 'seq1/frame_00005.zed.png', 'seq1/frame_00009.zed.png']
+        save_img_dir = "/Titan/code/robohike_ws/src/pose_estimation_models/outputs_duster"
+        estimator.save_results(scene_root, list_depth_img_name, save_img_dir, 0)
+
         estimator.show_reconstruction(cam_size=0.2)
 
 def parse_args():

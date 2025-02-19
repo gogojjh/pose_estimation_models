@@ -223,7 +223,6 @@ class BaseEstimator(torch.nn.Module):
     ) -> dict:
         assert list_img0_name, "list_img0 is empty"
 
-        # self._forward() is implemented by the children modules
         est_focal, est_im_pose, loss = \
             self._forward(scene_root, 
                           list_img0_name, img1_name, 
