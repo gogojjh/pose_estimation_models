@@ -44,10 +44,10 @@ class Dust3rEstimator(BaseEstimator):
 		if use_lora:
 			from dust3r.lora import LoraLayer, inject_lora
 			# NOTE(gogojjh): change the path of lora
-			lora_weight_path = WEIGHTS_DIR.joinpath("test_lora.pt")
+			self.lora_weight_path = WEIGHTS_DIR.joinpath("test_lora.pt")
 
 			# Traverse all lora layer
-			for name,layer in self.model.named_modules():
+			for name, layer in self.model.named_modules():
 				name_cols = name.split('.')
 				filter_names = ['qkv']
 				if any(n in name_cols for n in filter_names) and \
@@ -70,9 +70,9 @@ class Dust3rEstimator(BaseEstimator):
 					children = name_cols[:-1]
 					cur_layer = self.model 
 					for child in children:
-						cur_layer = getattr(cur_layer,child)  
+						cur_layer = getattr(cur_layer, child)
 					lora_weight = (layer.lora_a @ layer.lora_b) * layer.alpha / layer.r
-        			layer.raw_linear.weight.data += lora_weight.T
+					layer.raw_linear.weight.data += lora_weight.T
 					# Replace the LoRA layer with the updated linear layer
 					setattr(cur_layer, name_cols[-1], layer.raw_linear)
 		
@@ -175,7 +175,6 @@ class Dust3rEstimator(BaseEstimator):
 			conf='log',
 			calib_params=self.calib_params
 		)
-		self.scene = scene
 
 		if est_opts['known_extrinsics']:
 			known_poses = [pose for pose in list_img0_poses] + [np.eye(4)]
@@ -207,6 +206,7 @@ class Dust3rEstimator(BaseEstimator):
 		)
 
 		##### Get results
+		self.scene = scene
 		focals, im_poses = scene.get_focals(), scene.get_im_poses()
 		est_focal, est_im_pose = focals[-1], im_poses[-1]
 		return est_focal.detach(), est_im_pose.detach(), loss
