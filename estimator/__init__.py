@@ -19,10 +19,14 @@ available_models = [
     "hloc_disk_dilg",
     "vpr_cosplace_resnet18_512",
     "vpr_netvlad_resnet18_4096",
-    "duster",
-    "duster_calib",
-    "duster_lora",
-    "duster_calib_lora",
+    "duster_nocalib_pretrain",
+    "duster_calib_pretrain",
+    "duster_calib_ftlora_12pdepth",
+    "duster_calib_ftlora_16pdepth",
+    "duster_calib_ftlora_20pdepth",
+    "duster_calib_ftlora_12gtdepth",
+    "duster_calib_ftlora_16gtdepth",
+    "duster_calib_ftlora_20gtdepth",
     "master",
 ]
 
@@ -31,7 +35,7 @@ def get_version(pkg):
     major, minor, patch = [int(num) for num in version_num.split(".")]
     return major, minor, patch
 
-@supress_stdout
+# @supress_stdout
 def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048, out_dir='/tmp', *args, **kwargs):
     if 'hloc' in estimator_name:
         from estimator.models import hloc
@@ -121,18 +125,21 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         return vpr.VPREstimator(device, method_name, backbone_name, des_dimension, out_dir, *args, **kwargs)
 
     elif 'duster' in estimator_name or 'dust3r' in estimator_name:
-        # duster, duster_calib, duster_calib_lora
+        # Check for calibration and LoRA flags
         use_calib = '_calib' in estimator_name
-        use_lora = '_lora' in estimator_name
-        if not (estimator_name == 'duster' or estimator_name == 'dust3r') and \
-           not ('_calib' in estimator_name or '_lora' in estimator_name):
+        use_lora = '_ftlora' in estimator_name
+        
+        # Validate estimator name structure
+        is_base_model = estimator_name in ('duster', 'dust3r')
+        has_valid_components = any(s in estimator_name for s in ('_calib', '_nocalib', '_pretrain', '_ftlora'))
+        if not is_base_model and not has_valid_components:
             raise RuntimeError(
                 f"Estimator {estimator_name} for duster not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
             )
 
         from estimator.models import duster
         return duster.Dust3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
-
+    
     if 'master' in estimator_name or 'mast3r' in estimator_name:
         # master, master_calib, master_calib_lora
         use_calib = '_calib' in estimator_name

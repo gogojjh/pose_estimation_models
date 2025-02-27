@@ -42,9 +42,11 @@ class Dust3rEstimator(BaseEstimator):
 
 		# Inject lora weights on the original model
 		if use_lora:
+			if 'lora_weight' in kwargs:
+				lora_weight = kwargs['lora_weight']
+			else:
+				raise RuntimeError(f"Users doest not provide LoRA weight in Dust3rEstimator")
 			from dust3r.lora import LoraLayer, inject_lora
-			# NOTE(gogojjh): change the path of lora
-			self.lora_weight_path = WEIGHTS_DIR.joinpath("test_lora.pt")
 
 			# Traverse all lora layer
 			for name, layer in self.model.named_modules():
@@ -56,12 +58,12 @@ class Dust3rEstimator(BaseEstimator):
 			
 			# Load LoRA weights
 			try:
-				restore_lora_state = torch.load(self.lora_weight_path)
+				restore_lora_state = torch.load(lora_weight)
 				self.model.load_state_dict(restore_lora_state, strict=False)
 				num_lora_param = sum(param.numel() for param in restore_lora_state.values())
 				print(f'Number of LoRA Parameters: {num_lora_param}')
 			except:
-				pass 
+				raise RuntimeError(f"Users provides a incompatible or not existing LoRA weight {lora_weight} in Dust3rEstimator")
 
 			# Add LoRA weights into the model weight as the linear layer
 			for name, layer in self.model.named_modules():
@@ -79,6 +81,7 @@ class Dust3rEstimator(BaseEstimator):
 		num_model_param = sum(p.numel() for p in self.model.parameters())
 		print(f'Number of Model Parameters: {num_model_param}')
 		self.model = self.model.to(device)
+		self.model.eval()
 
 	@staticmethod
 	def download_weights():
@@ -187,13 +190,13 @@ class Dust3rEstimator(BaseEstimator):
 				ori_K = list_img_intr[idx]['K']
 				ori_im_size = list_img_intr[idx]['im_size']                    # WxH
 				new_im_size = torch.from_numpy(image['true_shape']).squeeze(0) # HxW
-				scale_w = new_im_size[0] / ori_im_size[1]
-				scale_h = new_im_size[1] / ori_im_size[0]
-				new_K = ori_K.clone()
-				new_K[0, 0] *= scale_w  # Focal length X
-				new_K[1, 1] *= scale_h  # Focal length Y
-				new_K[0, 2]  = new_K[0, 2] * scale_w  # Principal point X
-				new_K[1, 2]  = new_K[1, 2] * scale_h  # Principal point Y
+				scale_w = new_im_size[1] / ori_im_size[0]
+				scale_h = new_im_size[0] / ori_im_size[1]
+				new_K = torch.zeros_like(ori_K)
+				new_K[0, 0] = ori_K[0, 0] * scale_w  # Focal length X
+				new_K[1, 1] = ori_K[1, 1] * scale_h  # Focal length Y
+				new_K[0, 2] = ori_K[0, 2] * scale_w  # Principal point X
+				new_K[1, 2] = ori_K[1, 2] * scale_h  # Principal point Y
 				resize_list_img_K.append(new_K)
 			scene.preset_intrinsics(resize_list_img_K)
 
