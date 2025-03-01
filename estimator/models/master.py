@@ -29,7 +29,7 @@ class Mast3rEstimator(BaseEstimator):
 
         self.schedule = 'cosine'
         self.lr = 0.01
-        self.niter = 600
+        self.niter = 300
 
         self.download_weights()
         self.model = AsymmetricMASt3R.from_pretrained(self.model_path).to(device)

@@ -17,6 +17,8 @@ from dust3r.model import AsymmetricCroCo3DStereo
 from dust3r.image_pairs import make_pairs
 from dust3r.utils.image import load_images
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
+from dust3r.cloud_opt.commons import edge_str
+import dust3r.cloud_opt.init_im_poses as init_fun
 
 class Dust3rEstimator(BaseEstimator):
 	model_path = WEIGHTS_DIR.joinpath("duster_vit_large.pth")
@@ -26,62 +28,71 @@ class Dust3rEstimator(BaseEstimator):
 		super().__init__(device, **kwargs)
 		self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 		self.verbose = False
-
+		
+		# Initialize training schedule parameters
 		self.schedule = 'cosine'
 		self.lr = 0.01
 		self.niter = 300
 
+		# Load base model weights
 		self.download_weights()
 		self.model = AsymmetricCroCo3DStereo.from_pretrained(self.model_path)
+		print(f'Model Parameters: {sum(p.numel() for p in self.model.parameters()):,}')
 
-		# Parameters for confidence map calibration
-		if use_calib:
-			self.calib_params = dict(mu=1.0, conf_thre=0.5, pseudo_gt_thre=1.5)
-		else:
-			self.calib_params = None
-
-		# Inject lora weights on the original model
+		# Handle LoRA integration before moving to target device
 		if use_lora:
-			if 'lora_weight' in kwargs:
-				lora_weight = kwargs['lora_weight']
-			else:
-				raise RuntimeError(f"Users doest not provide LoRA weight in Dust3rEstimator")
-			from dust3r.lora import LoraLayer, inject_lora
+			if 'lora_path' not in kwargs:
+				raise RuntimeError("Missing required 'lora_path' argument for LoRA integration")
+			self._safely_integrate_lora(kwargs['lora_path'], target_device=device)
 
-			# Traverse all lora layer
-			for name, layer in self.model.named_modules():
-				name_cols = name.split('.')
-				filter_names = ['qkv']
-				if any(n in name_cols for n in filter_names) and \
-				   isinstance(layer, torch.nn.Linear):
-					inject_lora(self.model, name, layer)
-			
-			# Load LoRA weights
-			try:
-				restore_lora_state = torch.load(lora_weight)
-				self.model.load_state_dict(restore_lora_state, strict=False)
-				num_lora_param = sum(param.numel() for param in restore_lora_state.values())
-				print(f'Number of LoRA Parameters: {num_lora_param}')
-			except:
-				raise RuntimeError(f"Users provides a incompatible or not existing LoRA weight {lora_weight} in Dust3rEstimator")
-
-			# Add LoRA weights into the model weight as the linear layer
-			for name, layer in self.model.named_modules():
-				name_cols = name.split('.')
-				if isinstance(layer, LoraLayer):
-					children = name_cols[:-1]
-					cur_layer = self.model 
-					for child in children:
-						cur_layer = getattr(cur_layer, child)
-					lora_weight = (layer.lora_a @ layer.lora_b) * layer.alpha / layer.r
-					layer.raw_linear.weight.data += lora_weight.T
-					# Replace the LoRA layer with the updated linear layer
-					setattr(cur_layer, name_cols[-1], layer.raw_linear)
-		
-		num_model_param = sum(p.numel() for p in self.model.parameters())
-		print(f'Number of Model Parameters: {num_model_param}')
+		# Final device placement and model configuration
 		self.model = self.model.to(device)
 		self.model.eval()
+
+	# NOTE(gogojjh): support loading another lora params on-the-fly
+	def _safely_integrate_lora(self, lora_path: str, target_device: str):
+		"""Safely integrates LoRA weights with CPU-based processing to prevent CUDA errors.
+		
+		Args:
+			lora_path: Path to LoRA weights file
+			target_device: Original device for the model (preserves device context)
+		"""
+		from dust3r.lora import LoraLayer, inject_lora
+		
+		# Store original device and force CPU context
+		original_device = next(self.model.parameters()).device
+		self.model = self.model.to('cpu')
+
+		# Phase 1: Inject LoRA adapters
+		for name, module in self.model.named_modules():
+			if any(n in name.split('.') for n in ['qkv']) and isinstance(module, torch.nn.Linear):
+				inject_lora(self.model, name, module)
+
+		# Phase 2: Load LoRA weights
+		try:
+			lora_weights = torch.load(lora_path, map_location='cpu')
+			self.model.load_state_dict(lora_weights, strict=False)
+			print(f'LoRA Parameters: {sum(v.numel() for v in lora_weights.values()):,}')
+		except Exception as e:
+			raise RuntimeError(f"LoRA integration failed: {str(e)}")
+
+		# Phase 3: Merge LoRA weights into base model
+		for name, module in self.model.named_modules():
+			if isinstance(module, LoraLayer):
+				parent = self.model
+				# Traverse module hierarchy: a.b.c → getattr(a, 'b')
+				for component in name.split('.')[:-1]:
+					parent = getattr(parent, component)
+				
+				# Mathematical merge: W' = W + (A*B)*(α/r)
+				merged_weight = module.raw_linear.weight + (module.lora_a @ module.lora_b) * module.alpha / module.r
+				module.raw_linear.weight.data.copy_(merged_weight)
+				
+				# Replace composite layer with merged linear layer
+				setattr(parent, name.split('.')[-1], module.raw_linear)
+
+		# Restore original device context
+		self.model = self.model.to(target_device)
 
 	@staticmethod
 	def download_weights():
@@ -91,18 +102,9 @@ class Dust3rEstimator(BaseEstimator):
 			print("Downloading Dust3r(ViT large)... (takes a while)")
 			py3_wget.download_file(url, Dust3rEstimator.model_path)
 
-	def save_results(self, save_log, scene_root, list_depth_img_name, indice):
-		fig0 = self.visualize_weights_errors()
-		fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)
-		if indice % 5 == 0:
-			fig0.savefig(save_log / f"img_weight_error_{indice}.jpg")
-			fig1.savefig(save_log / f"depth_alignment_{indice}.jpg")
-		plt.close(fig0)
-		plt.close(fig1)
-		return avg_depth_error, corr_score
-
-	def show_reconstruction(self, cam_size=0.2):
-		self.scene.show(cam_size=cam_size)
+	@staticmethod
+	def get_edge_str(i, j):
+		return edge_str(i, j)
 
 	def preprocess(self, img):
 		_, h, w = img.shape
@@ -120,6 +122,35 @@ class Dust3rEstimator(BaseEstimator):
 			edge_scores = {e: float(self.scene.conf_i[e].median() * self.scene.conf_j[e].median()) 
 						   for e in self.scene.str_edges}
 		return edge_scores
+
+	def get_minimum_spanning_tree(self):
+		_, msp_edges, _, _ = init_fun.minimum_spanning_tree(
+			self.scene.imshapes, self.scene.edges,
+			self.scene.pred_i, self.scene.pred_j, 
+			self.scene.conf_i, self.scene.conf_j, 
+			self.scene.im_conf, 
+			self.scene.min_conf_thr,
+			self.scene.device, 
+			has_im_poses=self.scene.has_im_poses, 
+			verbose=self.scene.verbose
+		)
+		return msp_edges
+
+	def save_results(self, save_log, scene_root, list_depth_img_name, indice):
+		fig0 = self.visualize_weights_errors()
+		fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)
+		if indice % 5 == 0:
+			fig0.savefig(os.path.join(save_log, f"img_weight_error_{indice}.jpg"))
+			fig1.savefig(os.path.join(save_log, f"depth_alignment_{indice}.jpg"))
+		plt.close(fig0)
+		plt.close(fig1)
+		return avg_depth_error, corr_score
+
+	def show_reconstruction(self, cam_size=0.2):
+		self.scene.show(cam_size=cam_size)
+
+	def set_calib_params(self, new_calib_params):
+		self.calib_params = new_calib_params
 
 	def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
 		"""

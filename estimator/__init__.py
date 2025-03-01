@@ -21,12 +21,8 @@ available_models = [
     "vpr_netvlad_resnet18_4096",
     "duster_nocalib_pretrain",
     "duster_calib_pretrain",
-    "duster_calib_ftlora_12pdepth",
-    "duster_calib_ftlora_16pdepth",
-    "duster_calib_ftlora_20pdepth",
-    "duster_calib_ftlora_12gtdepth",
-    "duster_calib_ftlora_16gtdepth",
-    "duster_calib_ftlora_20gtdepth",
+    "duster_nocalib_ftlora_*pdepth",
+    "duster_nocalib_ftlora_*gtdepth",
     "master",
 ]
 
@@ -152,7 +148,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
 
         from estimator.models import master
         # return duster.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
-        return duster.Mast3rEstimator(device, *args, **kwargs)
+        return master.Mast3rEstimator(device, *args, **kwargs)
 
     else:
         raise RuntimeError(
