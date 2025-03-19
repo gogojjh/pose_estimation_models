@@ -19,10 +19,9 @@ available_models = [
     "hloc_disk_dilg",
     "vpr_cosplace_resnet18_512",
     "vpr_netvlad_resnet18_4096",
-    "duster_nocalib_pretrain",
+    "duster_{nocalib, calib}_pretrain",
     "duster_calib_pretrain",
-    "duster_nocalib_ftlora_*pdepth",
-    "duster_nocalib_ftlora_*gtdepth",
+    "duster_nocalib_ftlora_{pdepth, gtdepth}",
     "master",
 ]
 
@@ -137,18 +136,20 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         return duster.Dust3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
     
     if 'master' in estimator_name or 'mast3r' in estimator_name:
-        # master, master_calib, master_calib_lora
+        # Check for calibration and LoRA flags
         use_calib = '_calib' in estimator_name
-        use_lora = '_lora' in estimator_name
-        if not (estimator_name == 'master' or estimator_name == 'mast3r') and \
-           not ('_calib' in estimator_name or '_lora' in estimator_name):
+        use_lora = '_ftlora' in estimator_name
+        
+        # Validate estimator name structure
+        is_base_model = estimator_name in ('master', 'mast3r')
+        has_valid_components = any(s in estimator_name for s in ('_calib', '_nocalib', '_pretrain', '_ftlora'))
+        if not is_base_model and not has_valid_components:
             raise RuntimeError(
                 f"Estimator {estimator_name} for master not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
             )
 
         from estimator.models import master
-        # return duster.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
-        return master.Mast3rEstimator(device, *args, **kwargs)
+        return master.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
 
     else:
         raise RuntimeError(
