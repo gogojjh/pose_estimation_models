@@ -22,7 +22,9 @@ available_models = [
     "duster_{nocalib, calib}_pretrain",
     "duster_calib_pretrain",
     "duster_nocalib_ftlora_{pdepth, gtdepth}",
-    "master",
+    "master_{nocalib, calib}_pretrain",
+    "master_nocalib_pretrain_{pdepth, gtdepth}",
+    "reloc3r_pretrain",
 ]
 
 def get_version(pkg):
@@ -129,7 +131,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         has_valid_components = any(s in estimator_name for s in ('_calib', '_nocalib', '_pretrain', '_ftlora'))
         if not is_base_model and not has_valid_components:
             raise RuntimeError(
-                f"Estimator {estimator_name} for duster not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
+                f"Estimator {estimator_name} not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
             )
 
         from estimator.models import duster
@@ -145,11 +147,26 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         has_valid_components = any(s in estimator_name for s in ('_calib', '_nocalib', '_pretrain', '_ftlora'))
         if not is_base_model and not has_valid_components:
             raise RuntimeError(
-                f"Estimator {estimator_name} for master not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
+                f"Estimator {estimator_name} not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
             )
 
         from estimator.models import master
         return master.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
+
+    if 'reloc3r' in estimator_name:
+        # Check for calibration and LoRA flags
+        use_lora = '_ftlora' in estimator_name
+        
+        # Validate estimator name structure
+        is_base_model = estimator_name in ('reloc3r')
+        has_valid_components = any(s in estimator_name for s in ('_pretrain', '_ftlora'))
+        if not is_base_model and not has_valid_components:
+            raise RuntimeError(
+                f"Estimator {estimator_name} not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
+            )
+
+        from estimator.models import reloc3r
+        return reloc3r.Reloc3rEstimator(device, use_lora=use_lora, *args, **kwargs)
 
     else:
         raise RuntimeError(

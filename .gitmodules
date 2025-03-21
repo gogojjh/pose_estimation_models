@@ -58,3 +58,6 @@
 [submodule "estimator/third_party/NoPoSplat"]
 	path = estimator/third_party/NoPoSplat
 	url = https://github.com/cvg/NoPoSplat.git
+[submodule "estimator/third_party/reloc3r"]
+	path = estimator/third_party/reloc3r
+	url = https://github.com/ffrivera0/reloc3r

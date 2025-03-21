@@ -22,15 +22,15 @@ if not hasattr(sys, "ps1"):
 
 ##### Load images
 # Matterport3d
-N_ref_image = 3
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/matterport3d/map_free_eval/test/s00000/')
-K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
-im_size = np.array([640, 360]) # WxH
-est_opts = {
-    'known_extrinsics': True,
-    'known_intrinsics': True,
-    'resize': 512,
-}
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/matterport3d/map_free_eval/test/s00001/')
+# K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
+# im_size = np.array([640, 360]) # WxH
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': True,
+#     'resize': 512,
+# }
 
 # Replica
 # N_ref_image = 3
@@ -74,15 +74,15 @@ est_opts = {
 # }
 
 # hkustgz_campus
-# N_ref_image = 3
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test/s00005/')
-# K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
-# im_size = np.array([720, 1280])
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': True,
-#     'resize': 512,
-# }
+N_ref_image = 2
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test/s00000')
+K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
+im_size = np.array([1280, 720])
+est_opts = {
+    'known_extrinsics': True,
+    'known_intrinsics': True,
+    'resize': 512,
+}
 
 # 360Loc
 # N_ref_image = 12
@@ -105,14 +105,24 @@ est_opts = {
 #     'known_intrinsics': False,
 #     'resize': 512,
 # }
+    
+# N_ref_image = 3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00021')
+# K = np.array([[444.042, 0.0, 511.5], [0.0, 444.042, 287.5], [0.0, 0.0, 1.0]])
+# im_size = np.array([1024, 576]) # WxH
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': False,
+#     'resize': 512,
+# }
 
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
     estimator.verbose = True
     for i in range(1):
-        list_img0_name = ['seq0/frame_00000.jpg', 'seq1/frame_00005.jpg']
-        img1_name = 'seq1/frame_00009.jpg'
+        list_img0_name = ['seq1/frame_00000.jpg', 'seq1/frame_00001.jpg']
+        img1_name = 'seq0/frame_00000.jpg'
 
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
@@ -144,12 +154,25 @@ def main(args):
         print(f"Focal length: {result['focal'][0]:.03f}")
         print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
         print(f"Loss: {result['loss']:.03f}")
-        
-        list_depth_img_name = ['seq0/frame_00000.zed.png', 'seq1/frame_00005.zed.png', 'seq1/frame_00009.zed.png']
-        save_img_dir = "/Titan/code/robohike_ws/src/pose_estimation_models/outputs_duster"
-        estimator.save_results(scene_root, list_depth_img_name, save_img_dir, 0)
 
         estimator.show_reconstruction(cam_size=0.2)
+
+        # DEBUG(gogojjh):
+        # import cv2
+        # new_size = tuple((1024, 576)) # WxH
+        # depth_maps = estimator.scene.get_depthmaps()
+        # depth_map = (depth_maps[0].detach().cpu().numpy() * 1000.0).astype(np.uint16)
+        # re_depth = cv2.resize(depth_map, new_size, interpolation=cv2.INTER_NEAREST)
+        # cv2.imwrite('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00015/seq1/frame_00010.pdepth.png', re_depth)
+        # depth_map = (depth_maps[1].detach().cpu().numpy() * 1000.0).astype(np.uint16)
+        # re_depth = cv2.resize(depth_map, new_size, interpolation=cv2.INTER_NEAREST)
+        # cv2.imwrite('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00015/seq1/frame_00014.pdepth.png', re_depth)
+
+        # DEBUG(gogojjh):
+        # list_depth_img_name = ['seq1/frame_00019.pdepth.png', 'seq1/frame_00019.pdepth.png', 'seq1/frame_00021.pdepth.png']
+        # save_img_dir = "/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00021/preds"
+        # estimator.save_results(save_img_dir, scene_root, list_depth_img_name, 0)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
