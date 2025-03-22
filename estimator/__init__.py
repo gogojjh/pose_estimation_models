@@ -137,7 +137,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         from estimator.models import duster
         return duster.Dust3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
     
-    if 'master' in estimator_name or 'mast3r' in estimator_name:
+    elif 'master' in estimator_name or 'mast3r' in estimator_name:
         # Check for calibration and LoRA flags
         use_calib = '_calib' in estimator_name
         use_lora = '_ftlora' in estimator_name
@@ -153,7 +153,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         from estimator.models import master
         return master.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
 
-    if 'reloc3r' in estimator_name:
+    elif 'reloc3r' in estimator_name:
         # Check for calibration and LoRA flags
         use_lora = '_ftlora' in estimator_name
         

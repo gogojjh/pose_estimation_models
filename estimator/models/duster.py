@@ -27,6 +27,16 @@ class Dust3rEstimator(BaseEstimator):
     vit_patch_size = 16
 
     def __init__(self, device="cpu", use_calib=False, use_lora=False, *args, **kwargs):
+        """Initializes the Dust3rEstimator.
+
+        Args:
+            device (str): Device to run the model on.
+            model_args (str): Model arguments.
+            use_lora (bool): Whether to use LoRA.
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
+        """
+
         super().__init__(device, **kwargs)
         self.normalize = tfm.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         self.verbose = False
