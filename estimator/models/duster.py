@@ -8,7 +8,7 @@ import py3_wget
 
 from pathlib import Path
 
-from estimator.utils import add_to_path, resize_to_divisible
+from estimator.utils import add_to_path, resize_to_divisible, align_poses, to_numpy, to_tensor
 from estimator import WEIGHTS_DIR, THIRD_PARTY_DIR, BaseEstimator
 
 add_to_path(THIRD_PARTY_DIR.joinpath('duster'))
@@ -26,7 +26,7 @@ class Dust3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("duster_vit_large.pth")
     vit_patch_size = 16
 
-    def __init__(self, device="cpu", use_calib=False, use_lora=False, *args, **kwargs):
+    def __init__(self, device="cpu", use_calib=False, use_lora=False, use_grey=False, use_pa=False, *args, **kwargs):
         """Initializes the Dust3rEstimator.
 
         Args:
@@ -62,6 +62,15 @@ class Dust3rEstimator(BaseEstimator):
             if 'lora_path' not in kwargs:
                 raise RuntimeError("Missing required 'lora_path' argument for LoRA integration")
             self._safely_integrate_lora(kwargs['lora_path'], target_device=device)
+
+        if use_grey:
+            self.transform = tfm.Compose([
+                tfm.Grayscale(num_output_channels=3) # 3: to be compatible with MASt3R
+            ])
+        else:
+            self.transform = tfm.Compose([])
+
+        self.use_pa = use_pa
 
         # Final device placement and model configuration
         self.model = self.model.to(device)
@@ -214,6 +223,7 @@ class Dust3rEstimator(BaseEstimator):
                 verbose=self.verbose
             )
             loss = 0.0
+            return None, None, loss
         # GlobalAlignerMode.PointCloudOptimizer
         else:
             scene = global_aligner(
@@ -224,16 +234,6 @@ class Dust3rEstimator(BaseEstimator):
                 conf='log',
                 calib_params=self.calib_params
             )
-
-            if est_opts['known_extrinsics']:
-                known_poses = list_img0_poses.copy()
-                pose_msk = [True] * len(list_img0_poses)
-
-                if img1_name is not None:
-                    known_poses.append(np.eye(4))
-                    pose_msk.append(False)
-
-                scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
             if est_opts['known_intrinsics']:
                 list_img_intr = list_img0_intr.copy()
@@ -256,23 +256,50 @@ class Dust3rEstimator(BaseEstimator):
 
                 scene.preset_intrinsics(resize_list_img_K)
 
-            # Perform optimization
-            loss = scene.compute_global_alignment(
-                init="mst",
-                niter=self.niter,
-                schedule=self.schedule,
-                lr=self.lr
-            )
+            if not self.use_pa:
+                if est_opts['known_extrinsics']:
+                    known_poses = list_img0_poses.copy() + [np.eye(4)]
+                    pose_msk = [True] * len(list_img0_poses) + [False]
+                    scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
-        # Get results
-        self.scene = scene
-        focals, im_poses = scene.get_focals(), scene.get_im_poses()
-        est_focal = focals[-1] if img1_name is not None else None
-        est_im_pose = im_poses[-1] if img1_name is not None else None
-        return est_focal.detach() if est_focal is not None else None, \
-            est_im_pose.detach() if est_im_pose is not None else None, \
-            loss
+                # Perform optimization
+                loss = scene.compute_global_alignment(
+                    init="mst",
+                    niter=self.niter,
+                    schedule=self.schedule,
+                    lr=self.lr
+                )
+                self.scene = scene
+                
+                focals, im_poses = scene.get_focals(), scene.get_im_poses()
+                est_focal = focals[-1].detach()
+                est_im_pose = im_poses[-1].detach()
+                
+                return est_focal, est_im_pose, loss
+            else:
+                # Perform optimization
+                loss = scene.compute_global_alignment(
+                    init="mst",
+                    niter=self.niter,
+                    schedule=self.schedule,
+                    lr=self.lr
+                )
+                self.scene = scene
+                
+                focals, im_poses = scene.get_focals(), scene.get_im_poses()
+                est_focal = focals[-1].detach()
+                est_im_pose = im_poses[-1].detach()
+                if est_opts['known_extrinsics']:
+                    est_poses = [to_numpy(T.detach()) for T in im_poses]
+                    gt_poses = [to_numpy(T.detach()) for T in list_img0_poses]
+                    _, (s, R, t) = align_poses(est_poses[:-1], gt_poses)
+                    est_im_pose = np.eye(4)
+                    est_im_pose[:3, :3] = R @ est_poses[-1][:3, :3]
+                    est_im_pose[:3,  3] = s * R @ est_poses[-1][:3, 3] + t
+                    est_im_pose = to_tensor(est_im_pose)
 
+                return est_focal, est_im_pose, loss
+                       
     def save_results(self, save_log, scene_root, list_depth_img_name, indice):
         fig0 = self.visualize_weights_errors()
         fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)

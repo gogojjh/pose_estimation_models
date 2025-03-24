@@ -16,6 +16,65 @@ from sklearn.decomposition import PCA
 logger = logging.getLogger()
 logger.setLevel(31)  # Avoid printing useless low-level logs
 
+def align_poses(estimated_poses, gt_poses):
+    """
+    Align estimated poses to ground truth using similarity transformation.
+    
+    Args:
+        estimated_poses: List of 4x4 transformation matrices [T0, T1, T2]
+        gt_poses: List of 4x4 transformation matrices [G0, G1, G2]
+    
+    Returns:
+        List of aligned 4x4 transformation matrices
+    """
+    # Extract corresponding translations (T0-T2 and G0-G2)
+    src_pts = [T[:3, 3] for T in estimated_poses]
+    tgt_pts = [G[:3, 3] for G in gt_poses]
+
+    # Compute centroids
+    mu_src = np.mean(src_pts, axis=0)
+    mu_tgt = np.mean(tgt_pts, axis=0)
+
+    # Center points
+    src_centered = src_pts - mu_src
+    tgt_centered = tgt_pts - mu_tgt
+
+    # Compute covariance matrix H
+    H = np.dot(src_centered.T, tgt_centered)
+
+    # Singular Value Decomposition
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+
+    # Handle reflection case
+    if np.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+
+    # Compute scale
+    src_var = np.sum([np.linalg.norm(p)**2 for p in src_centered])
+    scale = np.trace(np.diag(S)) / src_var
+
+    # Compute translation
+    translation = mu_tgt - scale * (R @ mu_src)
+
+    # Apply transformation to all estimated poses
+    aligned_poses = []
+    for T in estimated_poses:
+        R_est = T[:3, :3]
+        t_est = T[:3, 3]
+        
+        # Align rotation and translation
+        R_aligned = R @ R_est
+        t_aligned = scale * (R @ t_est) + translation
+        
+        # Create aligned transformation matrix
+        aligned_T = np.eye(4)
+        aligned_T[:3, :3] = R_aligned
+        aligned_T[:3, 3] = t_aligned
+        aligned_poses.append(aligned_T)
+
+    return aligned_poses, (scale, R, translation)
 def convert_vec_to_matrix(vec_p, vec_q, mode='xyzw'):
 	# Initialize a 4x4 identity matrix
 	tf = np.eye(4)
@@ -182,7 +241,7 @@ def to_tensor(x: Union[np.ndarray, torch.Tensor], device: str = None) -> torch.T
         pass
     elif isinstance(x, np.ndarray):
         x = torch.from_numpy(x)
-
+        return x
     if device is not None:
         return x.to(device)
 

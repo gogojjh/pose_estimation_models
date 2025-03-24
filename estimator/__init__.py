@@ -24,6 +24,8 @@ available_models = [
     "duster_nocalib_ftlora_{pdepth, gtdepth}",
     "master_{nocalib, calib}_pretrain",
     "master_nocalib_pretrain_{pdepth, gtdepth}",
+    "master_nocalib_pretrain_grey",
+    "master_nocalib_pretrain_grey_pa"
     "reloc3r_pretrain",
 ]
 
@@ -125,6 +127,8 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
         # Check for calibration and LoRA flags
         use_calib = '_calib' in estimator_name
         use_lora = '_ftlora' in estimator_name
+        use_grey = '_grey' in estimator_name
+        use_pa = '_pa' in estimator_name
         
         # Validate estimator name structure
         is_base_model = estimator_name in ('duster', 'dust3r')
@@ -135,12 +139,14 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
             )
 
         from estimator.models import duster
-        return duster.Dust3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
+        return duster.Dust3rEstimator(device, use_calib=use_calib, use_lora=use_lora, use_grey=use_grey, use_pa=use_pa, *args, **kwargs)
     
     elif 'master' in estimator_name or 'mast3r' in estimator_name:
         # Check for calibration and LoRA flags
         use_calib = '_calib' in estimator_name
         use_lora = '_ftlora' in estimator_name
+        use_grey = '_grey' in estimator_name
+        use_pa = '_pa' in estimator_name
         
         # Validate estimator name structure
         is_base_model = estimator_name in ('master', 'mast3r')
@@ -151,7 +157,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
             )
 
         from estimator.models import master
-        return master.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, *args, **kwargs)
+        return master.Mast3rEstimator(device, use_calib=use_calib, use_lora=use_lora, use_grey=use_grey, use_pa=use_pa, *args, **kwargs)
 
     elif 'reloc3r' in estimator_name:
         # Check for calibration and LoRA flags

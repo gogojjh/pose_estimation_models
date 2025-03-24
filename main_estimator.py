@@ -64,25 +64,25 @@ if not hasattr(sys, "ps1"):
 # }
 
 # ucl_campus_meta_glass
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus/s00000/out_map0/')
-# K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
-# im_size = np.array([576, 1024])
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus_aria/map_free_eval/test/s00001/')
+K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
+im_size = np.array([1024, 576])
+est_opts = {
+    'known_extrinsics': True,
+    'known_intrinsics': False,
+    'resize': 512,
+}
+
+# hkustgz_campus
+# N_ref_image = 2
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test_gray/s00000')
+# K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
+# im_size = np.array([1280, 720])
 # est_opts = {
 #     'known_extrinsics': True,
 #     'known_intrinsics': True,
 #     'resize': 512,
 # }
-
-# hkustgz_campus
-N_ref_image = 2
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test/s00000')
-K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
-im_size = np.array([1280, 720])
-est_opts = {
-    'known_extrinsics': True,
-    'known_intrinsics': True,
-    'resize': 512,
-}
 
 # 360Loc
 # N_ref_image = 12
@@ -121,7 +121,7 @@ def main(args):
     estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
     estimator.verbose = True
     for i in range(1):
-        list_img0_name = ['seq1/frame_00000.jpg', 'seq1/frame_00001.jpg']
+        list_img0_name = ['seq1/frame_00000.jpg', 'seq1/frame_00001.jpg', 'seq1/frame_00006.jpg', 'seq1/frame_00007.jpg']
         img1_name = 'seq0/frame_00000.jpg'
 
         poses_load = {}
@@ -148,14 +148,14 @@ def main(args):
 
         start_time = time.time()
         result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
-        edge_scores = estimator.get_similarity()
+        # edge_scores = estimator.get_similarity()
         print(f"Processing time: {time.time() - start_time:.2f}s")
-        print(f"Edge score: {edge_scores}")
-        print(f"Focal length: {result['focal'][0]:.03f}")
+        # print(f"Edge score: {edge_scores}")
+        # print(f"Focal length: {result['focal'][0]:.03f}")
         print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
         print(f"Loss: {result['loss']:.03f}")
 
-        estimator.show_reconstruction(cam_size=0.2)
+        estimator.show_reconstruction()
 
         # DEBUG(gogojjh):
         # import cv2
@@ -184,8 +184,7 @@ def parse_args():
         "--model",
         type=str,
         default="master",
-        choices=available_models,
-        help="choose your model",
+        help=f"choose your model: {available_models}",
     )
 
     # Hyperparameters shared by all methods:

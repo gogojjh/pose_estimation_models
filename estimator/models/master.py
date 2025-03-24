@@ -5,7 +5,7 @@ import py3_wget
 import numpy as np
 
 from estimator import BaseEstimator, WEIGHTS_DIR, THIRD_PARTY_DIR
-from estimator.utils import resize_to_divisible, add_to_path
+from estimator.utils import resize_to_divisible, add_to_path, to_numpy, to_tensor, align_poses
 
 add_to_path(THIRD_PARTY_DIR.joinpath("mast3r"))
 
@@ -26,7 +26,7 @@ class Mast3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("MASt3r_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth")
     vit_patch_size = 16
 
-    def __init__(self, device="cpu", use_calib=False, use_lora=False, *args, **kwargs):
+    def __init__(self, device="cpu", use_calib=False, use_lora=False, use_grey=False, use_pa=False, *args, **kwargs):
         """Initializes the Mast3rEstimator.
 
         Args:
@@ -59,6 +59,15 @@ class Mast3rEstimator(BaseEstimator):
             if 'lora_path' not in kwargs:
                 raise RuntimeError("Missing required 'lora_path' argument for LoRA integration")
             self._safely_integrate_lora(kwargs['lora_path'], target_device=device)
+
+        if use_grey:
+            self.transform = tfm.Compose([
+                tfm.Grayscale(num_output_channels=3) # 3: to be compatible with MASt3R
+            ])
+        else:
+            self.transform = tfm.Compose([])
+
+        self.use_pa = use_pa
 
         # Final device placement and model configuration
         self.model = self.model.to(device)
@@ -267,10 +276,14 @@ class Mast3rEstimator(BaseEstimator):
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
         resize = est_opts.get('resize', 512)
+
         imgs_path = [str(scene_root / img_name) for img_name in list_img0_name]
         if img1_name is not None:
             imgs_path.append(str(scene_root / img1_name))
         images = load_images(imgs_path, size=resize, verbose=self.verbose)
+        for image in images: 
+            image['img'] = self.transform(image['img'])
+
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
         assert len(imgs_path) == len(images)
 
@@ -307,6 +320,10 @@ class Mast3rEstimator(BaseEstimator):
                 verbose=self.verbose
             )
             loss = 0.0
+
+            # Get results
+            self.scene = scene
+            return None, None, loss
         # GlobalAlignerMode.PointCloudOptimizer
         else:
             scene = global_aligner(
@@ -317,16 +334,6 @@ class Mast3rEstimator(BaseEstimator):
                 conf='log',
                 calib_params=self.calib_params
             )
-
-            if est_opts['known_extrinsics']:
-                known_poses = list_img0_poses.copy()
-                pose_msk = [True] * len(list_img0_poses)
-
-                if img1_name is not None:
-                    known_poses.append(np.eye(4))
-                    pose_msk.append(False)
-
-                scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
             if est_opts['known_intrinsics']:
                 list_img_intr = list_img0_intr.copy()
@@ -349,23 +356,50 @@ class Mast3rEstimator(BaseEstimator):
 
                 scene.preset_intrinsics(resize_list_img_K)
 
-            # Perform optimization
-            loss = scene.compute_global_alignment(
-                init="mst",
-                niter=self.niter,
-                schedule=self.schedule,
-                lr=self.lr
-            )
+            if not self.use_pa:
+                if est_opts['known_extrinsics']:
+                    known_poses = list_img0_poses.copy() + [np.eye(4)]
+                    pose_msk = [True] * len(list_img0_poses) + [False]
+                    scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
-        # Get results
-        self.scene = scene
-        focals, im_poses = scene.get_focals(), scene.get_im_poses()
-        est_focal = focals[-1] if img1_name is not None else None
-        est_im_pose = im_poses[-1] if img1_name is not None else None
-        return est_focal.detach() if est_focal is not None else None, \
-            est_im_pose.detach() if est_im_pose is not None else None, \
-            loss
+                # Perform optimization
+                loss = scene.compute_global_alignment(
+                    init="mst",
+                    niter=self.niter,
+                    schedule=self.schedule,
+                    lr=self.lr
+                )
+                self.scene = scene
+                
+                focals, im_poses = scene.get_focals(), scene.get_im_poses()
+                est_focal = focals[-1].detach()
+                est_im_pose = im_poses[-1].detach()
+                
+                return est_focal, est_im_pose, loss
+            else:
+                # Perform optimization
+                loss = scene.compute_global_alignment(
+                    init="mst",
+                    niter=self.niter,
+                    schedule=self.schedule,
+                    lr=self.lr
+                )
+                self.scene = scene
+                
+                focals, im_poses = scene.get_focals(), scene.get_im_poses()
+                est_focal = focals[-1].detach()
+                est_im_pose = im_poses[-1].detach()
+                if est_opts['known_extrinsics']:
+                    est_poses = [to_numpy(T.detach()) for T in im_poses]
+                    gt_poses = [to_numpy(T.detach()) for T in list_img0_poses]
+                    _, (s, R, t) = align_poses(est_poses[:-1], gt_poses)
+                    est_im_pose = np.eye(4)
+                    est_im_pose[:3, :3] = R @ est_poses[-1][:3, :3]
+                    est_im_pose[:3,  3] = s * R @ est_poses[-1][:3, 3] + t
+                    est_im_pose = to_tensor(est_im_pose)
 
+                return est_focal, est_im_pose, loss
+                
     def save_results(self):
         """Saves the results (not implemented)."""
         pass
