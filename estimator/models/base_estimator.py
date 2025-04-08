@@ -5,8 +5,7 @@ from PIL import Image
 import torchvision.transforms as tfm
 import warnings
 from pathlib import Path
-from typing import Tuple
-from typing import Union
+from typing import Union, Tuple, List, Dict
 
 from estimator.utils import to_normalized_coords, to_px_coords, to_numpy, to_tensor
 
@@ -19,7 +18,7 @@ class BaseEstimator(torch.nn.Module):
     """
 
     # OpenCV default Ransac params
-    DEFAULT_RANSAC_ITERS = 2000
+    DEFAULT_RANSAC_ITERS = 1000
     DEFAULT_RANSAC_CONF = 0.95
     DEFAULT_REPROJ_THRESH = 3
 
@@ -43,7 +42,9 @@ class BaseEstimator(torch.nn.Module):
 
     @staticmethod
     def load_image(
-        path: Union[str, Path], resize: Union[int, Tuple] = None, rot_angle: float = 0
+        path: Union[str, Path], 
+        resize: Union[int, Tuple] = None, # HxW e.g., (288, 512)
+        rot_angle: float = 0
     ) -> torch.Tensor:
         if isinstance(resize, int):
             resize = (resize, resize)
@@ -156,7 +157,8 @@ class BaseEstimator(torch.nn.Module):
         self, 
         scene_root: Path, 
         img0: Union[torch.Tensor, str, Path], 
-        img1: Union[torch.Tensor, str, Path]
+        img1: Union[torch.Tensor, str, Path],
+        resize: Union[Tuple[int, int]] = None,
     ) -> dict:
         """
         All sub-classes implement the following interface:
@@ -185,9 +187,9 @@ class BaseEstimator(torch.nn.Module):
         """
         # Take as input a pair of images (not a batch)
         if isinstance(img0, (str, Path)):
-            img0 = BaseEstimator.load_image(scene_root / img0)
+            img0 = BaseEstimator.load_image(scene_root / img0, resize)
         if isinstance(img1, (str, Path)):
-            img1 = BaseEstimator.load_image(scene_root / img1)
+            img1 = BaseEstimator.load_image(scene_root / img1, resize)
 
         assert isinstance(img0, torch.Tensor)
         assert isinstance(img1, torch.Tensor)
@@ -195,7 +197,8 @@ class BaseEstimator(torch.nn.Module):
         img0 = img0.to(self.device)
         img1 = img1.to(self.device)
 
-        matched_kpts0, matched_kpts1, all_kpts0, all_kpts1, all_desc0, all_desc1 = self._get_matched_kpts(img0, img1)
+        matched_kpts0, matched_kpts1, all_kpts0, all_kpts1, all_desc0, all_desc1 \
+            = self._get_matched_kpts(img0, img1)
 
         matched_kpts0, matched_kpts1 = to_numpy(matched_kpts0), to_numpy(matched_kpts1)
         H, inlier_kpts0, inlier_kpts1 = self.process_matches(matched_kpts0, matched_kpts1)
@@ -216,19 +219,24 @@ class BaseEstimator(torch.nn.Module):
     def forward(
         self,
         scene_root: Path,
-        list_img0_name, img1_name, 
-        list_img0_poses, 
-        list_img0_intr, img1_intr,
-        est_opts
+        list_img0: Union[List[torch.Tensor], List[str], List[Path]], 
+        img1: Union[List[torch.Tensor], List[str], List[Path]], 
+        list_img0_poses: Union[List[torch.Tensor]], 
+        list_img0_intr: Union[List[torch.Tensor]], 
+        img1_intr: Union[torch.Tensor],
+        est_opts: Dict
     ) -> dict:
-        assert list_img0_name, "list_img0 is empty"
-
+        assert list_img0, "list_img0 is empty"
         est_focal, est_im_pose, loss = \
-            self._forward(scene_root, 
-                          list_img0_name, img1_name, 
-                          list_img0_poses, 
-                          list_img0_intr, img1_intr,
-                          est_opts)
+            self._forward(
+                scene_root, 
+                list_img0,
+                img1, 
+                list_img0_poses, 
+                list_img0_intr,
+                img1_intr,
+                est_opts
+            )
         if isinstance(est_focal, (int, float)): est_focal = np.array([est_focal])
         return {
             "focal": to_numpy(est_focal),

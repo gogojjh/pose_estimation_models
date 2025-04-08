@@ -21,6 +21,10 @@ from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from dust3r.cloud_opt.commons import edge_str
 from dust3r.lora import LoraLayer, inject_lora
 import dust3r.cloud_opt.init_im_poses as init_fun
+from dust3r.utils.geometry import find_reciprocal_matches, xy_grid
+
+from typing import Union, List, Tuple, Dict
+from pathlib import Path
 
 class Dust3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("duster_vit_large.pth")
@@ -166,7 +170,64 @@ class Dust3rEstimator(BaseEstimator):
     def show_reconstruction(self, cam_size=None):
         self.scene.show() if cam_size is None else self.scene.show(cam_size=cam_size)
 
-    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
+    def _get_matched_kpts(self, img0, img1):
+        """Gets the matched keypoints.
+
+        Args:
+            img0 (torch.Tensor): First image tensor.
+            img1 (torch.Tensor): Second image tensor.
+
+        Returns:
+            tuple: Matched keypoints and other related data.
+        """
+        img0, img0_orig_shape = self.preprocess(img0)
+        img1, img1_orig_shape = self.preprocess(img1)
+
+        img_pair = [
+            {"img": img0, "idx": 0, "instance": 0, "true_shape": np.int32([img0.shape[-2:]])},
+            {"img": img1, "idx": 1, "instance": 1, "true_shape": np.int32([img1.shape[-2:]])},
+        ]
+        output = inference([tuple(img_pair)], self.model, self.device, batch_size=1, verbose=False)
+
+        scene = global_aligner(
+            output,
+            device=self.device,
+            mode=GlobalAlignerMode.PairViewer,
+            conf='log',
+            verbose=self.verbose
+        )
+        confidence_masks = scene.get_masks()
+        pts3d = scene.get_pts3d()
+        imgs = scene.imgs
+
+        pts2d_list, pts3d_list = [], []
+        for i in range(2):
+            conf_i = confidence_masks[i].cpu().numpy()
+            pts2d_list.append(xy_grid(*imgs[i].shape[:2][::-1])[conf_i])  # imgs[i].shape[:2] = (H, W)
+            pts3d_list.append(pts3d[i].detach().cpu().numpy()[conf_i])
+        reciprocal_in_P2, nn2_in_P1, _ = find_reciprocal_matches(*pts3d_list)
+
+        mkpts1 = pts2d_list[1][reciprocal_in_P2]
+        mkpts0 = pts2d_list[0][nn2_in_P1][reciprocal_in_P2]
+
+        # duster sometimes requires reshaping an image to fit vit patch size evenly, so we need to
+        # rescale kpts to the original img
+        H0, W0, H1, W1 = *img0.shape[-2:], *img1.shape[-2:]
+        mkpts0 = self.rescale_coords(mkpts0, *img0_orig_shape, H0, W0)
+        mkpts1 = self.rescale_coords(mkpts1, *img1_orig_shape, H1, W1)
+
+        return mkpts0, mkpts1, None, None, None, None
+
+    def _forward(
+        self, 
+        scene_root: Path,
+        list_img0: Union[List[torch.Tensor], List[str], List[Path]], 
+        img1: Union[List[torch.Tensor], List[str], List[Path]], 
+        list_img0_poses: Union[List[torch.Tensor]], 
+        list_img0_intr: Union[List[torch.Tensor]], 
+        img1_intr: Union[torch.Tensor],
+        est_opts: Dict
+    ):
         """Performs the forward pass of the pose estimation model.
 
         Args:
@@ -183,12 +244,38 @@ class Dust3rEstimator(BaseEstimator):
         """
 
         resize = est_opts.get('resize', 512)
-        imgs_path = [str(scene_root / img_name) for img_name in list_img0_name]
-        if img1_name is not None:
-            imgs_path.append(str(scene_root / img1_name))
-        images = load_images(imgs_path, size=resize, verbose=self.verbose)
+        self.niter = est_opts.get('niter', self.niter)
+        
+        num_img_input = len(list_img0) + 1
+
+        # Load database images
+        if isinstance(list_img0[0], torch.Tensor) and isinstance(img1, torch.Tensor):
+            images = []
+            for img in list_img0:
+                image = {
+                    "img": self.preprocess(img)[0], 
+                    "idx": len(images), 
+                    "instance": str(len(images)), 
+                    "true_shape": np.int32([img.shape[-2:]])
+                }
+                images.append(image)
+    
+            images.append({
+                "img": self.preprocess(img1)[0], 
+                "idx": len(images), 
+                "instance": str(len(images)), 
+                "true_shape": np.int32([img.shape[-2:]])
+            })
+        else:
+            imgs_path = [str(scene_root / img_name) for img_name in list_img0 + [img1]]
+            images = load_images(imgs_path, size=resize, verbose=self.verbose)
+
+        # Preprocess images (convert into gray image)
+        for image in images: 
+            image['img'] = self.transform(image['img'])
+
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
-        assert len(imgs_path) == len(images)
+        assert num_img_input == len(images)
 
         # At this stage, you have the raw dust3r predictions
         # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
@@ -211,10 +298,12 @@ class Dust3rEstimator(BaseEstimator):
         #   view2['img', 'true_shape', 'idx', 'instance'])
         #   pred1['pts3d', 'conf', 'desc', 'desc_conf'])
         #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view'])
+        
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
+        self.output_inference = output
 
         # GlobalAlignerMode.PairViewer
-        if len(imgs_path) == 2:
+        if num_img_input == 2:
             scene = global_aligner(
                 output,
                 device=self.device,

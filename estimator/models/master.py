@@ -20,10 +20,12 @@ from dust3r.cloud_opt.commons import edge_str
 from dust3r.lora import LoraLayer, inject_lora
 import dust3r.cloud_opt.init_im_poses as init_fun
 
+from typing import Union, List, Tuple, Dict
+from pathlib import Path
 
 class Mast3rEstimator(BaseEstimator):
     """Estimator class for MASt3R model."""
-    model_path = WEIGHTS_DIR.joinpath("MASt3r_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth")
+    model_path = WEIGHTS_DIR.joinpath("MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth")
     vit_patch_size = 16
 
     def __init__(self, device="cpu", use_calib=False, use_lora=False, use_grey=False, use_pa=False, *args, **kwargs):
@@ -50,6 +52,7 @@ class Mast3rEstimator(BaseEstimator):
 
         # Set default calib_params
         if use_calib:
+            print('Use calibrated confidence map')
             self.set_calib_params(dict(mu=1.0, conf_thre=0.5, pseudo_gt_thre=1.5, use_weight_opt=False))
         else:
             self.set_calib_params(None)
@@ -260,7 +263,16 @@ class Mast3rEstimator(BaseEstimator):
 
         return mkpts0, mkpts1, None, None, None, None
 
-    def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
+    def _forward(
+        self, 
+        scene_root: Path,
+        list_img0: Union[List[torch.Tensor], List[str], List[Path]], 
+        img1: Union[List[torch.Tensor], List[str], List[Path]], 
+        list_img0_poses: Union[List[torch.Tensor]], 
+        list_img0_intr: Union[List[torch.Tensor]], 
+        img1_intr: Union[torch.Tensor],
+        est_opts: Dict
+    ):
         """Performs the forward pass of the pose estimation model.
 
         Args:
@@ -275,17 +287,39 @@ class Mast3rEstimator(BaseEstimator):
         Returns:
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
-        resize = est_opts.get('resize', 512)
+        self.niter = est_opts.get('niter', self.niter)
+        
+        num_img_input = len(list_img0) + 1
 
-        imgs_path = [str(scene_root / img_name) for img_name in list_img0_name]
-        if img1_name is not None:
-            imgs_path.append(str(scene_root / img1_name))
-        images = load_images(imgs_path, size=resize, verbose=self.verbose)
+        # Load database images
+        if isinstance(list_img0[0], torch.Tensor) and isinstance(img1, torch.Tensor):
+            images = []
+            for img in list_img0:
+                image = {
+                    "img": self.preprocess(img)[0], 
+                    "idx": len(images), 
+                    "instance": str(len(images)), 
+                    "true_shape": np.int32([img.shape[-2:]])
+                }
+                images.append(image)
+    
+            images.append({
+                "img": self.preprocess(img1)[0], 
+                "idx": len(images), 
+                "instance": str(len(images)), 
+                "true_shape": np.int32([img.shape[-2:]])
+            })
+        else:
+            resize = est_opts.get('resize', 512)
+            imgs_path = [str(scene_root / img_name) for img_name in list_img0 + [img1]]
+            images = load_images(imgs_path, size=resize, verbose=self.verbose)
+
+        # Preprocess images (convert into gray image)
         for image in images: 
             image['img'] = self.transform(image['img'])
 
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
-        assert len(imgs_path) == len(images)
+        assert num_img_input == len(images)
 
         # At this stage, you have the raw dust3r predictions
         # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
@@ -304,14 +338,23 @@ class Mast3rEstimator(BaseEstimator):
         # if using GlobalAlignerMode.PairViewer, no need to run compute_global_alignment
         # Summary: Keys of output, view1, pred1, view2, pred2
         #   output['view1', 'view2', 'pred1', 'pred2', 'loss'])
-        #   view1['img', 'true_shape', 'idx', 'instance'])
-        #   view2['img', 'true_shape', 'idx', 'instance'])
-        #   pred1['pts3d', 'conf', 'desc', 'desc_conf'])
-        #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view'])
+        #   view1['img', 'true_shape', 'idx', 'instance']) = output['view1']
+        #   view2['img', 'true_shape', 'idx', 'instance']) = output['view1']
+        #       for idx in output['view1']['idx']:
+        #           print(idx) # output 2 idxs
+        #   pred1['pts3d', 'conf', 'desc', 'desc_conf']) = output['pred1']
+        #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view']) = output['pred2']
+        #       for pts3d in output['pred1']['pts3d']:
+        #           print(pts3d) # output 2 pts3d
+        # Example: get predict pts from two-view
+        # pts3d = scene.get_pts3d()[n]
+        # confidence_masks = scene.get_masks()[n]
+
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
+        self.output_inference = output
 
         # GlobalAlignerMode.PairViewer
-        if len(imgs_path) == 2:
+        if num_img_input == 2:
             scene = global_aligner(
                 output,
                 device=self.device,
@@ -356,9 +399,10 @@ class Mast3rEstimator(BaseEstimator):
 
                 scene.preset_intrinsics(resize_list_img_K)
 
+            # not use pose alignment
             if not self.use_pa:
                 if est_opts['known_extrinsics']:
-                    known_poses = list_img0_poses.copy() + [np.eye(4)]
+                    known_poses = list_img0_poses.copy() + [torch.eye(4)]
                     pose_msk = [True] * len(list_img0_poses) + [False]
                     scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 

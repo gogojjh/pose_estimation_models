@@ -25,7 +25,7 @@ available_models = [
     "master_{nocalib, calib}_pretrain",
     "master_nocalib_pretrain_{pdepth, gtdepth}",
     "master_nocalib_pretrain_grey",
-    "master_nocalib_pretrain_grey_pa"
+    "master_nocalib_pretrain_grey_pa",
     "reloc3r_pretrain",
 ]
 
