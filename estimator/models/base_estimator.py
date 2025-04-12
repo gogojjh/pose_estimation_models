@@ -18,7 +18,7 @@ class BaseEstimator(torch.nn.Module):
     """
 
     # OpenCV default Ransac params
-    DEFAULT_RANSAC_ITERS = 1000
+    DEFAULT_RANSAC_ITERS = 2000
     DEFAULT_RANSAC_CONF = 0.95
     DEFAULT_REPROJ_THRESH = 3
 
@@ -43,18 +43,31 @@ class BaseEstimator(torch.nn.Module):
     @staticmethod
     def load_image(
         path: Union[str, Path], 
-        resize: Union[int, Tuple] = None, # HxW e.g., (288, 512)
-        rot_angle: float = 0
+        resize: Union[int, Tuple] = None, # WxH e.g., 512x288
+        rot_angle: float = 0,
+        normalized: bool = False
     ) -> torch.Tensor:
+
         if isinstance(resize, int):
             resize = (resize, resize)
-        img = tfm.ToTensor()(Image.open(path).convert("RGB"))
-        tensor_size1 = img.shape
-
+        
+        # Set up transformations: - Convert to tensor, - Normalize, - Resize
+        transformations = [tfm.ToTensor()]
+        if normalized:
+            transformations.append(
+                tfm.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            )
         if resize is not None:
-            img = tfm.Resize(resize, antialias=False)(img)
-        img = tfm.functional.rotate(img, rot_angle)
-        tensor_size2 = img.shape
+            new_size = (resize[1], resize[0]) # HxW
+            transformations.append(tfm.Resize(size=new_size, antialias=True))
+        transform = tfm.Compose(transformations)
+
+        # Load image and apply transformation
+        pil_img = Image.open(path).convert("RGB")
+        # tensor_size1 = (pil_img.size[1], pil_img.size[0])
+
+        img = transform(np.array(pil_img))
+        # tensor_size2 = img.shape
 
         # print(f" - adding {path} with resolution {tensor_size1} --> {tensor_size2}")
         return img
@@ -158,7 +171,7 @@ class BaseEstimator(torch.nn.Module):
         scene_root: Path, 
         img0: Union[torch.Tensor, str, Path], 
         img1: Union[torch.Tensor, str, Path],
-        resize: Union[Tuple[int, int]] = None,
+        resize: Union[Tuple[int, int]] = None, # HxW
     ) -> dict:
         """
         All sub-classes implement the following interface:
