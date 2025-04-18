@@ -9,6 +9,23 @@ from typing import Union, Tuple, List, Dict
 
 from estimator.utils import to_normalized_coords, to_px_coords, to_numpy, to_tensor
 
+class GrayWorldCorrection:
+    """Torch-compatible transform that applies Gray World color correction to a PIL image."""
+    def __call__(self, img: Image.Image) -> Image.Image:
+        # Convert PIL to NumPy array (RGB)
+        img_np = np.array(img)
+
+        # Apply gray world correction in RGB format
+        img_float = img_np.astype(np.float32)
+        means = img_float.mean(axis=(0, 1))
+        overall_mean = np.mean(means)
+        scale = overall_mean / means
+        img_corrected = img_float * scale
+        img_corrected = np.clip(img_corrected, 0, 255).astype(np.uint8)
+
+        # Convert corrected NumPy image back to PIL
+        return Image.fromarray(img_corrected)
+
 class BaseEstimator(torch.nn.Module):
     """
     This serves as a base class for all matchers. It provides a simple interface
@@ -44,8 +61,7 @@ class BaseEstimator(torch.nn.Module):
     def load_image(
         path: Union[str, Path], 
         resize: Union[int, Tuple] = None, # WxH e.g., 512x288
-        rot_angle: float = 0,
-        normalized: bool = False
+        color_correct = False
     ) -> torch.Tensor:
 
         if isinstance(resize, int):
@@ -53,18 +69,19 @@ class BaseEstimator(torch.nn.Module):
         
         # Set up transformations: - Convert to tensor, - Normalize, - Resize
         transformations = [tfm.ToTensor()]
-        if normalized:
-            transformations.append(
-                tfm.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            )
+
         if resize is not None:
             new_size = (resize[1], resize[0]) # HxW
             transformations.append(tfm.Resize(size=new_size, antialias=True))
+
+        if color_correct:
+            transformations.insert(0, GrayWorldCorrection())
+
         transform = tfm.Compose(transformations)
 
         # Load image and apply transformation
         pil_img = Image.open(path).convert("RGB")
-        # tensor_size1 = (pil_img.size[1], pil_img.size[0])
+        # tensor_size1 = (pil_img.size[1], pil_img.size[0]) # HXW
 
         img = transform(np.array(pil_img))
         # tensor_size2 = img.shape

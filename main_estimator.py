@@ -15,6 +15,7 @@ import pycolmap
 
 from estimator.utils import get_image_pairs_paths
 from estimator import get_estimator, available_models
+from estimator import BaseEstimator
 
 # This is to be able to use matplotlib also without a GUI
 if not hasattr(sys, "ps1"):
@@ -64,13 +65,26 @@ if not hasattr(sys, "ps1"):
 # }
 
 # ucl_campus_meta_glass
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus_aria/map_free_eval/test/s00001/')
-K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus_aria/map_free_eval/test/s00001/')
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus_aria/s00000/out_map0')
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus_aria/s00000_results_in_kf_spgo_seqmatch/merge_finalmap')
+# K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
+# im_size = np.array([1024, 576])
+# est_opts = {
+#     'known_extrinsics': True,
+#     'known_intrinsics': False,
+#     'resize': 512,
+#     'niter': 300
+# }
+
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/hkust/s00000_data/5')
+K = np.array([[444.042084, 0.0, 511.500000], [0.0, 444.042084, 287.500000], [0.0, 0.0, 1.0]])
 im_size = np.array([1024, 576])
 est_opts = {
     'known_extrinsics': True,
     'known_intrinsics': False,
     'resize': 512,
+    'niter': 300
 }
 
 # hkustgz_campus
@@ -118,12 +132,16 @@ est_opts = {
 
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
-    estimator = get_estimator(args.model, device=args.device, max_num_keypoint=args.max_num_keypoint, out_dir=args.out_dir)
+    estimator = get_estimator(
+        args.model, 
+        device=args.device, 
+        max_num_keypoint=args.max_num_keypoint, 
+        out_dir=args.out_dir
+    )
     estimator.verbose = True
     for i in range(1):
-        list_img0_name = ['seq1/frame_00000.jpg', 'seq1/frame_00001.jpg', 'seq1/frame_00006.jpg', 'seq1/frame_00007.jpg']
-        img1_name = 'seq0/frame_00000.jpg'
-
+        list_img0_name = ['seq/000039.color.jpg', 'seq/000040.color.jpg']
+        img1_name = '../8/seq/000076.color.jpg'
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
             for line in f.readlines():
@@ -146,16 +164,44 @@ def main(args):
         list_img0_intr = [{'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)} for _ in list_img0_name]
         img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
+        list_img0 = [BaseEstimator.load_image(scene_root/name, (512, 288), color_correct=True) for name in list_img0_name]
+        img1 = BaseEstimator.load_image(scene_root/img1_name, (512, 288), color_correct=True)
+
         start_time = time.time()
-        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
-        # edge_scores = estimator.get_similarity()
+        result = estimator(scene_root, list_img0, img1, list_img0_poses, list_img0_intr, img1_intr, est_opts)
         print(f"Processing time: {time.time() - start_time:.2f}s")
         # print(f"Edge score: {edge_scores}")
         # print(f"Focal length: {result['focal'][0]:.03f}")
-        print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
-        print(f"Loss: {result['loss']:.03f}")
+        # print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
+        # print(f"Loss: {result['loss']:.03f}")
+
+        msp_edges = estimator.get_minimum_spanning_tree()
+        weight_i, weight_j = estimator.scene.weight_i, estimator.scene.weight_j
+        for edge in msp_edges:
+            if edge[0] == 2 or edge[1] == 2: # confidence of the query image
+                edge_str = f"{edge[0]}_{edge[1]}"
+                conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
+                print(f"Conf of {edge_str}: {conf:.3f}")
 
         estimator.show_reconstruction()
+
+        # Visualize results
+        result = estimator.get_matched_kpts(scene_root, list_img0[0], img1)
+        print(f"Number of inliers: {result['num_inliers']}")
+
+        import open3d as o3d
+        all_pts3d = estimator.scene.get_pts3d() # all pts3d in the world frame
+        msk_conf = estimator.scene.get_masks()
+        # pts3d_flat = all_pts3d[0][msk_conf[0]].reshape(-1, 3)
+        pts3d_flat = all_pts3d[0].reshape(-1, 3)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
+        o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_0.pcd', pcd)
+        # pts3d_flat = all_pts3d[1][msk_conf[1]].reshape(-1, 3)
+        pts3d_flat = all_pts3d[1].reshape(-1, 3)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
+        o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_1.pcd', pcd)
 
         # DEBUG(gogojjh):
         # import cv2
