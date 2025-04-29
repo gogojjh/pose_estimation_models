@@ -9,22 +9,45 @@ from typing import Union, Tuple, List, Dict
 
 from estimator.utils import to_normalized_coords, to_px_coords, to_numpy, to_tensor
 
-class GrayWorldCorrection:
-    """Torch-compatible transform that applies Gray World color correction to a PIL image."""
-    def __call__(self, img: Image.Image) -> Image.Image:
-        # Convert PIL to NumPy array (RGB)
-        img_np = np.array(img)
+class ColorCorrection:
+    """
+    Torch-compatible transform that combines Gray World correction with:
+    - Gamma-aware processing (sRGB <-> linear)
+    - Daylight (5000K) color temperature compensation
+    - Blue channel reduction to counteract Aria's blueish tint
+    """
+    @staticmethod
+    def srgb_to_linear(ts: torch.Tensor) -> torch.Tensor:
+        """Convert sRGB to linear RGB (gamma decoding)."""
+        return torch.where(ts <= 0.04045, ts / 12.92, ((ts + 0.055) / 1.055).pow(2.4))
 
-        # Apply gray world correction in RGB format
-        img_float = img_np.astype(np.float32)
-        means = img_float.mean(axis=(0, 1))
-        overall_mean = np.mean(means)
-        scale = overall_mean / means
-        img_corrected = img_float * scale
-        img_corrected = np.clip(img_corrected, 0, 255).astype(np.uint8)
+    @staticmethod
+    def linear_to_srgb(ts: torch.Tensor) -> torch.Tensor:
+        """Convert linear RGB to sRGB (gamma encoding)."""
+        return torch.where(ts <= 0.0031308, ts * 12.92, 1.055 * ts.pow(1 / 2.4) - 0.055)
+    
+    def __init__(self, comp_blue: float = 0.95):
+        self.temp_comp = torch.tensor([
+            [1.00, 0.00, 0.00],      # Red stays same
+            [0.00, 1.00, 0.00],      # Green stays same
+            [0.00, 0.00, comp_blue]  # Reduce blue slightly
+        ])
 
-        # Convert corrected NumPy image back to PIL
-        return Image.fromarray(img_corrected)
+    def __call__(self, img_tensor: torch.Tensor) -> torch.Tensor:
+        # Step 1: sRGB -> linear RGB
+        linear = ColorCorrection.srgb_to_linear(img_tensor)
+        # Step 2: Gray World correction in linear RGB
+        means = linear.mean(dim=[1, 2])             # Channel means
+        mean_intensity = means.mean()
+        scale = mean_intensity / (means + 1e-6)     # Avoid divide-by-zero
+        scaled = linear * scale[:, None, None]      # Apply scale per channel
+        # Step 3: Apply 5000K temp compensation matrix
+        corrected = torch.einsum("ij,jhw->ihw", self.temp_comp, scaled)
+        # Step 4: linear -> sRGB
+        srgb = ColorCorrection.linear_to_srgb(torch.clamp(corrected, 0, 1))
+
+        return srgb
+
 
 class BaseEstimator(torch.nn.Module):
     """
@@ -75,7 +98,7 @@ class BaseEstimator(torch.nn.Module):
             transformations.append(tfm.Resize(size=new_size, antialias=True))
 
         if color_correct:
-            transformations.insert(0, GrayWorldCorrection())
+            transformations.append(ColorCorrection(comp_blue=0.95))
 
         transform = tfm.Compose(transformations)
 
