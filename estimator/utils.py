@@ -89,6 +89,7 @@ def convert_vec_to_matrix(vec_p, vec_q, mode='xyzw'):
 		# Set the translation part of the transformation matrix
 		tf[:3, 3] = vec_p
 	return tf
+
 def convert_matrix_to_vec(tf_matrix, mode='xyzw'):
 	if mode == 'xyzw':
 		# Extract the translation vector from the matrix
