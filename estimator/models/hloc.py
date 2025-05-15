@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from estimator import THIRD_PARTY_DIR, BaseEstimator
-from estimator.utils import to_numpy, add_to_path, convert_matrix_to_vec, convert_vec_to_matrix
+from estimator.utils import to_numpy, add_to_path, convert_matrix_to_vec, convert_vec_to_matrix, align_poses
 
 add_to_path(THIRD_PARTY_DIR.joinpath('Hierarchical-Localization'), insert=0)
 
@@ -58,12 +58,10 @@ class HlocEstimator(BaseEstimator):
 
         # 3D Visualization
         scene = viz_3d.init_figure()
-
         # Viz 1: Visualize mapping
         viz_3d.plot_reconstruction(
             scene, self.model, color="rgba(255,0,0,0.5)", name="mapping", points_rgb=True
         )
-        
         # Viz 2: Visualize query camera and world coordinate system
         pose = pycolmap.Image(cam_from_world=self.ret["cam_from_world"])
         viz_3d.plot_camera_colmap(
@@ -81,9 +79,9 @@ class HlocEstimator(BaseEstimator):
             [self.model.points3D[pid].xyz for pid in np.array(self.log["points3D_ids"])[self.ret["inliers"]]]
         )
         viz_3d.plot_points(scene, inl_3d, color="lime", ps=1, name=self.query_name)
-
+        # Save the scene
         scene.write_image(log_dir / "preds" / "reconstruction.png")
-        for image in self.model.images.values(): print(image)
+        # for image in self.model.images.values(): print(image)
         # print('Query camera: ', self.query_camera)
 
         self.scene = scene
@@ -102,6 +100,11 @@ class HlocEstimator(BaseEstimator):
         match_features.main(self.matcher_conf, self.path_loc_pairs, features=self.path_features, matches=self.path_matches, overwrite=True)
 
     def estimate_pose(self, scene_root, references, query, cam_opts=None, mapper_opts=None):
+        """
+        Return: 
+            pose_w2c: the pose represented in the camera coordinate to the world coordinate
+                      i.e., transform a point in world to camera
+        """
         self.feature_process(scene_root, references, query)
         # Reconstruction
         model = reconstruction.main(self.path_sfm_dir, scene_root, self.path_sfm_pairs, 
@@ -117,9 +120,13 @@ class HlocEstimator(BaseEstimator):
             query_camera = pycolmap.infer_camera_from_image(scene_root / query, cam_opts)
         else:
             query_camera = pycolmap.infer_camera_from_image(scene_root / query)
+        
         ref_ids = [model.find_image_with_name(r).image_id for r in references if model.find_image_with_name(r) is not None]
         localizer = QueryLocalizer(model, self.loc_conf)
         ret, log = pose_from_cluster(localizer, query, query_camera, ref_ids, self.path_features, self.path_matches)
+        if ret is None: 
+            return None, None, None, None, None
+        
         print(f'found {ret["num_inliers"]}/{len(ret["inliers"])} inlier correspondences.')
         ret_query = {
             'num_med_points3D': num_med_points3D,
@@ -129,19 +136,22 @@ class HlocEstimator(BaseEstimator):
             'log': log
         }
         est_focal = query_camera.params[0]
-        est_im_pose = ret['cam_from_world'].matrix()
+        pose_w2c = np.vstack((ret['cam_from_world'].matrix(), [0, 0, 0, 1]))
         loss = model.compute_mean_reprojection_error()
 
-        return model, ret_query, est_focal, est_im_pose, loss
+        return model, ret_query, est_focal, pose_w2c, loss
     
     def estimate_pose_with_int_and_ext(self, scene_root, references, query, reference_poses, reference_ints, query_int):
+        print(f'Reference: {references}')
+        print(f'Query: {query}')
         # Reference images
         images, cameras = {}, {}
         for idx, ref_img in enumerate(references):
-            pose_w2c = reference_poses[idx]
-            # Convert colmap Pose from world to camera
-            pose_c2w = np.linalg.inv(pose_w2c)
-            txyz, qwxyz = convert_matrix_to_vec(pose_c2w, 'wxyz')
+            pose_w = reference_poses[idx]
+            # The reference pose is given w.r.t the world coordinate
+            # Then convert into the colmap pose w.r.t. the camera coordinate
+            pose_c = np.linalg.inv(pose_w)
+            txyz, qwxyz = convert_matrix_to_vec(pose_c, 'wxyz')
             image = Image(
                 id=idx, qvec=qwxyz, tvec=txyz,
                 camera_id=idx, name=ref_img,
@@ -172,48 +182,48 @@ class HlocEstimator(BaseEstimator):
         match_features.main(self.matcher_conf, self.path_sfm_pairs, features=self.path_features, matches=self.path_matches)
 
         # NOTE(gogjjh): the pycolmap.triangulation() may crash in c++, use mp.Process() to avoid crash
-        q = mp.Queue()
-        p = mp.Process(
-            target=lambda q: q.put(triangulation.main(
-                colmap_sparse,
-                colmap_arkit,
-                scene_root,
-                self.path_sfm_pairs,
-                self.path_features,
-                self.path_matches,
-                skip_geometric_verification=False,
-                estimate_two_view_geometries=False,
-                verbose=False
-            )),
-            args=(q,)
-        )
-        p.start()
-        p.join(120)
-        if p.exitcode != 0:
-            print(f"Triangulation failed (exit code {p.exitcode})")
-            return (None, ) * 5
-        else:
-            model = triangulation.main(
-                colmap_sparse,
-                colmap_arkit,
-                scene_root,
-                self.path_sfm_pairs,
-                self.path_features,
-                self.path_matches,
-                skip_geometric_verification=False,
-                estimate_two_view_geometries=False,
-                verbose=False
-            )
+        # q = mp.Queue()
+        # p = mp.Process(
+        #     target=lambda q: q.put(triangulation.main(
+        #         colmap_sparse,
+        #         colmap_arkit,
+        #         scene_root,
+        #         self.path_sfm_pairs,
+        #         self.path_features,
+        #         self.path_matches,
+        #         skip_geometric_verification=False,
+        #         estimate_two_view_geometries=False,
+        #         verbose=False
+        #     )),
+        #     args=(q,)
+        # )
+        # p.start()
+        # p.join(120)
+        # if p.exitcode != 0:
+        #     print(f"Triangulation failed (exit code {p.exitcode})")
+        #     return (None, ) * 5
+        # else:
+        # model = triangulation.main(
+        #     colmap_sparse,
+        #     colmap_arkit,
+        #     scene_root,
+        #     self.path_sfm_pairs,
+        #     self.path_features,
+        #     self.path_matches,
+        #     skip_geometric_verification=False,
+        #     estimate_two_view_geometries=False,
+        #     verbose=False
+        # )
 
         # NOTE(gogojjh) (not used): the api does not use scale information
-        # model = reconstruction.main(
-        #     self.path_sfm_dir, 
-        #     scene_root, 
-        #     self.path_sfm_pairs, 
-        #     self.path_features, 
-        #     self.path_matches, 
-        #     image_list=references
-        # )
+        model = reconstruction.main(
+            self.path_sfm_dir, 
+            scene_root, 
+            self.path_sfm_pairs, 
+            self.path_features, 
+            self.path_matches, 
+            image_list=references
+        )
 
         num_med_points3D = np.median(np.array([image.num_points3D for image in model.images.values()]))
         cnt = sum(1 for image in model.images.values() if image.num_points3D > num_med_points3D / 2) # DEBUG
@@ -240,10 +250,10 @@ class HlocEstimator(BaseEstimator):
             'log': log
         }
         est_focal = query_camera.params[0]
-        est_im_pose = ret['cam_from_world'].matrix()
+        pose_w2c = np.vstack((ret['cam_from_world'].matrix(), [0, 0, 0, 1]))
         loss = model.compute_mean_reprojection_error()
 
-        return model, ret_query, est_focal, est_im_pose, loss
+        return model, ret_query, est_focal, pose_w2c, loss
 
     def _forward(self, scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts):
         list_img0_poses = [to_numpy(pose) for pose in list_img0_poses]
@@ -261,11 +271,63 @@ class HlocEstimator(BaseEstimator):
         if est_opts['known_extrinsics']:
             # estimate query poses with known extrinsics
             print('Estimate Extrinsics of query camera')
-            model, ret_query, est_focal, est_im_pose, loss = \
-                self.estimate_pose_with_int_and_ext(
-                    scene_root, list_img0_name, img1_name, 
-                    list_img0_poses, list_img0_intr, img1_intr
-                )
+            # model, ret_query, est_focal, est_im_pose, loss = \
+            #     self.estimate_pose_with_int_and_ext(
+            #         scene_root, list_img0_name, img1_name, 
+            #         list_img0_poses, list_img0_intr, img1_intr
+            #     )
+
+            model, ret_query, est_focal, est_im_pose_w2c, loss = \
+                self.estimate_pose(scene_root, list_img0_name, img1_name)
+
+            if model is None:
+                return None, None, None
+
+            est_poses, gt_poses = [], []
+            for image in model.images.values():
+                pose_c = np.eye(4)
+                pose_c[:3, :] = image.cam_from_world.matrix()
+                pose_w = np.linalg.inv(pose_c)
+                est_poses.append(pose_w)
+                
+                img_id = list_img0_name.index(image.name)
+                gt_poses.append(list_img0_poses[img_id])
+
+            _, (s, R, t) = align_poses(est_poses, gt_poses)
+
+            ##### DEBUG
+            # print(len(est_poses), len(gt_poses))
+            # print()
+            # print('Estimated')
+            # for pose in est_poses:
+            #     print(pose[:3, 3].transpose())
+            # # print(est_im_pose[:3, 3].transpose())
+
+            # print('GT')
+            # for pose in gt_poses:
+            #     print(pose[:3, 3].transpose())
+
+            # print('Aligned Estimated')
+            # for pose in est_poses:
+            #     pose_align = np.eye(4)
+            #     pose_align[:3, :3] = R @ pose[:3, :3]
+            #     pose_align[:3,  3] = s * R @ pose[:3, 3] + t
+            #     print(pose_align[:3, 3].transpose())
+
+            # print('Aligned s R t:')
+            # print(s)
+            # print(R)
+            # print(t)
+            #####
+
+            est_im_pose_c2w = np.linalg.inv(est_im_pose_w2c)
+            est_im_pose = np.eye(4)
+            est_im_pose[:3, :3] = R @ est_im_pose_c2w[:3, :3]
+            est_im_pose[:3,  3] = s * R @ est_im_pose_c2w[:3, 3] + t
+
+            # print('Initial Estimate: ', est_im_pose_c2w[:3, 3])
+            # print('Aligned Estimate: ', est_im_pose[:3, 3])
+
         elif est_opts['known_intrinsics']:
             # estimate reference and query poses with known intrinsics
             # assume the same intrinsics for all images
@@ -273,13 +335,15 @@ class HlocEstimator(BaseEstimator):
             fx, fy, cx, cy = list_img0_intr[0]['K'][0][0], list_img0_intr[0]['K'][1][1], list_img0_intr[0]['K'][0][2], list_img0_intr[0]['K'][1][2]
             cam_opts = dict(camera_model='PINHOLE', camera_params=','.join(map(str, [fx, fy, cx, cy])))
             mapper_opts = dict(ba_refine_focal_length=False, ba_refine_extra_params=False)
-            model, ret_query, est_focal, est_im_pose, loss = \
+            model, ret_query, est_focal, est_im_pose_w2c, loss = \
                 self.estimate_pose(scene_root, list_img0_name, img1_name, cam_opts, mapper_opts)
+            est_im_pose = np.linalg.inv(est_im_pose_w2c)
         else:
             # estimate reference and query poses and focal length
             print('Estimate Intrinsics and Extrinsics of all cameras')
-            model, ret_query, est_focal, est_im_pose, loss = \
+            model, ret_query, est_focal, est_im_pose_w2c, loss = \
                 self.estimate_pose(scene_root, list_img0_name, img1_name)
+            est_im_pose = np.linalg.inv(est_im_pose_w2c)
 
         if model is None:
             return None, None, None
