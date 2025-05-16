@@ -17,6 +17,7 @@ __version__ = "1.0.0"
 
 available_models = [
     "hloc_disk_dilg",
+    "hloc_superpoint_splg",
     "vpr_cosplace_resnet18_512",
     "vpr_netvlad_resnet18_4096",
     "duster_{nocalib, calib}_pretrain",
@@ -38,10 +39,10 @@ def get_version(pkg):
 def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048, out_dir='/tmp', *args, **kwargs):
     if 'hloc' in estimator_name:
         from estimator.models import hloc
-        
+
         # ['superpoint_max', 'superpoint_inloc', 'r2d2', 'd2net-ss', 'sift', 'sosnet', 'disk', 'aliked-n16']
         name1 = estimator_name.split('_')[1]
-        if name1 == 'suerpoint':
+        if name1 == 'superpoint':
             feature_name = 'superpoint_max'
         elif name1 == 'r2d2':
             feature_name = 'r2d2'
@@ -85,7 +86,7 @@ def get_estimator(estimator_name="master", device="cpu", max_num_keypoints=2048,
                 f"Matcher {name2} for hloc not yet supported. Consider submitted a PR to add it. Available models: {available_models}"
             )
 
-        return hloc.HlocEstimator(device, feature_name, matcher_name, max_num_keypoints, out_dir, *args, **kwargs)
+        return hloc.HlocEstimator(device, feature_name, matcher_name, out_dir, *args, **kwargs)
 
     elif 'vpr' in estimator_name:
         method_name = estimator_name.split('_')[1]
