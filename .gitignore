@@ -6,4 +6,5 @@ outputs_*
 *.egg-info/*
 assets/*
 build/*
+tmp/
 test/

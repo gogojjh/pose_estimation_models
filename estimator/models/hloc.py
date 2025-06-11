@@ -69,7 +69,7 @@ class HlocEstimator(BaseEstimator):
 	def estimate_pose(self, scene_root, references, query, cam_opts=None, mapper_opts=None):
 		print(scene_root, references, query)
 		##### Feature processing
-		# Reference
+		##### Reference
 		extract_features.main(
 			self.feature_conf, scene_root, 
 			image_list=references, feature_path=self.paths['features'], overwrite=True
@@ -124,6 +124,12 @@ class HlocEstimator(BaseEstimator):
 		}, focal, pose, model.compute_mean_reprojection_error()
 
 	def _forward(self, scene_root, refs, query, ref_poses, ref_ints, query_int, est_opts):
+		# Clean up previous results
+		import os
+		for path in self.paths.values():
+			os.system(f"rm -rf {path}")
+
+		# Start estimation
 		ref_poses = [to_numpy(p) for p in ref_poses]
 		ref_ints = [{'K': to_numpy(i['K']), 'im_size': to_numpy(i['im_size'])} for i in ref_ints]
 		query_int = {k: to_numpy(v) for k,v in query_int.items()}
@@ -165,6 +171,6 @@ class HlocEstimator(BaseEstimator):
 		self.query_name = result['query_name']
 		self.query_camera = result['query_camera']
 		self.ret = result['ret']
-		self.log = result['log']		
+		self.log = result['log']
 
 		return (focal, np.linalg.inv(pose), loss) if model else (None,)*3

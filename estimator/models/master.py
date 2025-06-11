@@ -5,7 +5,7 @@ import py3_wget
 import numpy as np
 
 from estimator import BaseEstimator, WEIGHTS_DIR, THIRD_PARTY_DIR
-from estimator.utils import resize_to_divisible, add_to_path, to_numpy, to_tensor, align_poses
+from estimator.utils import resize_to_divisible, add_to_path
 
 add_to_path(THIRD_PARTY_DIR.joinpath("mast3r"))
 
@@ -28,7 +28,7 @@ class Mast3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth")
     vit_patch_size = 16
 
-    def __init__(self, device="cpu", use_calib=False, use_lora=False, use_grey=False, use_pa=False, *args, **kwargs):
+    def __init__(self, device="cpu", use_calib=False, use_lora=False, use_grey=False, *args, **kwargs):
         """Initializes the Mast3rEstimator.
 
         Args:
@@ -69,8 +69,6 @@ class Mast3rEstimator(BaseEstimator):
             ])
         else:
             self.transform = tfm.Compose([])
-
-        self.use_pa = use_pa
 
         # Final device placement and model configuration
         self.model = self.model.to(device)
@@ -288,7 +286,6 @@ class Mast3rEstimator(BaseEstimator):
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
         self.niter = est_opts.get('niter', self.niter)
-        
         num_img_input = len(list_img0) + 1
 
         # Load database images
@@ -321,7 +318,7 @@ class Mast3rEstimator(BaseEstimator):
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
         assert num_img_input == len(images)
 
-        # At this stage, you have the raw dust3r predictions
+        # NOTE(gogojjh): At this stage, you have the raw dust3r predictions
         # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
         #  -> because we symmetrize we have (im1, im2) and (im2, im1) pairs
         # in each view you have:
@@ -399,50 +396,25 @@ class Mast3rEstimator(BaseEstimator):
 
                 scene.preset_intrinsics(resize_list_img_K)
 
-            # not use pose alignment
-            if not self.use_pa:
-                if est_opts['known_extrinsics']:
-                    known_poses = list_img0_poses.copy() + [torch.eye(4)]
-                    pose_msk = [True] * len(list_img0_poses) + [False]
-                    scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
+            if est_opts['known_extrinsics']:
+                known_poses = list_img0_poses.copy() + [torch.eye(4)]
+                pose_msk = [True] * len(list_img0_poses) + [False]
+                scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
-                # Perform optimization
-                loss = scene.compute_global_alignment(
-                    init="mst",
-                    niter=self.niter,
-                    schedule=self.schedule,
-                    lr=self.lr
-                )
-                self.scene = scene
-                
-                focals, im_poses = scene.get_focals(), scene.get_im_poses()
-                est_focal = focals[-1].detach()
-                est_im_pose = im_poses[-1].detach()
-                
-                return est_focal, est_im_pose, loss
-            else:
-                # Perform optimization
-                loss = scene.compute_global_alignment(
-                    init="mst",
-                    niter=self.niter,
-                    schedule=self.schedule,
-                    lr=self.lr
-                )
-                self.scene = scene
-                
-                focals, im_poses = scene.get_focals(), scene.get_im_poses()
-                est_focal = focals[-1].detach()
-                est_im_pose = im_poses[-1].detach()
-                if est_opts['known_extrinsics']:
-                    est_poses = [to_numpy(T.detach()) for T in im_poses]
-                    gt_poses = [to_numpy(T.detach()) for T in list_img0_poses]
-                    _, (s, R, t) = align_poses(est_poses[:-1], gt_poses)
-                    est_im_pose = np.eye(4)
-                    est_im_pose[:3, :3] = R @ est_poses[-1][:3, :3]
-                    est_im_pose[:3,  3] = s * R @ est_poses[-1][:3, 3] + t
-                    est_im_pose = to_tensor(est_im_pose)
-
-                return est_focal, est_im_pose, loss
+            # Perform optimization
+            loss = scene.compute_global_alignment(
+                init="mst",
+                niter=self.niter,
+                schedule=self.schedule,
+                lr=self.lr
+            )
+            self.scene = scene
+            
+            focals, im_poses = scene.get_focals(), scene.get_im_poses()
+            est_focal = focals[-1].detach()
+            est_im_pose = im_poses[-1].detach()
+            
+            return est_focal, est_im_pose, loss
                 
     def save_results(self):
         """Saves the results (not implemented)."""
