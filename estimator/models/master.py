@@ -52,8 +52,9 @@ class Mast3rEstimator(BaseEstimator):
 
         # Set default calib_params
         if use_calib:
-            print('Use calibrated confidence map')
-            self.set_calib_params(dict(mu=1.0, conf_thre=0.5, pseudo_gt_thre=1.5, use_weight_opt=False))
+            print('Use calibrated confidence map and weight optimization')
+            calib_params = dict(mu=5.0, conf_thre=0.0, pseudo_gt_thre=0.0, use_weight_opt=False, use_alt_opt=False)
+            self.set_calib_params(calib_params)
         else:
             self.set_calib_params(None)
 
