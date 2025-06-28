@@ -58,7 +58,7 @@ class Dust3rEstimator(BaseEstimator):
         # Set default calib_params
         if use_calib:
             print('Use calibrated confidence map and weight optimization')
-            calib_params = dict(mu=5.0, conf_thre=0.0, pseudo_gt_thre=0.0, use_weight_opt=False, use_alt_opt=False)
+            calib_params = dict(mu=5.0, conf_thre=0.5, pseudo_gt_thre=0.0, use_weight_opt=True, use_alt_opt=False)
             self.set_calib_params(calib_params)
         else:
             self.set_calib_params(None)
@@ -318,6 +318,8 @@ class Dust3rEstimator(BaseEstimator):
                 device=self.device,
                 mode=GlobalAlignerMode.ModularPointCloudOptimizer,
                 verbose=self.verbose,
+                dist='l1',
+                allow_pw_adaptors=True,
                 conf='log',
                 calib_params=self.calib_params
             )
