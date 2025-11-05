@@ -67,7 +67,7 @@ class HlocEstimator(BaseEstimator):
 		self.scene.show()
 
 	def estimate_pose(self, scene_root, references, query, cam_opts=None, mapper_opts=None):
-		print(scene_root, references, query)
+		# print(scene_root, references, query)
 		##### Feature processing
 		##### Reference
 		extract_features.main(

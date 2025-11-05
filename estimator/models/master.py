@@ -44,6 +44,7 @@ class Mast3rEstimator(BaseEstimator):
         self.schedule = 'cosine'
         self.lr = 0.01
         self.niter = 300
+        self.two_stage_opt_niter = 50
 
         self.download_weights()
         self.model = AsymmetricMASt3R.from_pretrained(self.model_path).to(device)
@@ -276,6 +277,7 @@ class Mast3rEstimator(BaseEstimator):
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
         self.niter = est_opts.get('niter', self.niter)
+        self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', self.two_stage_opt_niter)
         num_img_input = len(list_img0) + 1
 
         # Load database images
@@ -401,11 +403,11 @@ class Mast3rEstimator(BaseEstimator):
             ###########################
             # Perform two-stage optimization to adjust the noisy poses
             if est_opts['known_extrinsics']:
-                if 'two_stage_opt_niter' in est_opts and est_opts['two_stage_opt_niter'] > 0:
+                if self.two_stage_opt_niter > 0:
                     im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
                     for pose_param in scene.im_poses:
                         pose_param.requires_grad_(True)
-                    loss = global_alignment_loop(scene, niter=est_opts['two_stage_opt_niter'], schedule=self.schedule, lr=self.lr)
+                    loss = global_alignment_loop(scene, niter=self.two_stage_opt_niter, schedule=self.schedule, lr=self.lr)
                     im_poses_second = scene.get_im_poses()
                     for idx in range(len(im_poses_second)):
                         t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
