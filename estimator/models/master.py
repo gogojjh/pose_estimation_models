@@ -373,7 +373,6 @@ class Mast3rEstimator(BaseEstimator):
                 mode=GlobalAlignerMode.ModularPointCloudOptimizer,
                 verbose=self.verbose,
                 dist='l1',
-                allow_pw_adaptors=True,
                 conf='log',
                 calib_params=self.calib_params
             )
@@ -405,9 +404,8 @@ class Mast3rEstimator(BaseEstimator):
                 scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
             # Perform optimization
-            init_ga = 'mst'
             loss = scene.compute_global_alignment(
-                init=init_ga,
+                init="mst",
                 niter=self.niter,
                 schedule=self.schedule,
                 lr=self.lr

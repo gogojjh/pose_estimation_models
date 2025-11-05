@@ -319,7 +319,6 @@ class Dust3rEstimator(BaseEstimator):
                 mode=GlobalAlignerMode.ModularPointCloudOptimizer,
                 verbose=self.verbose,
                 dist='l1',
-                allow_pw_adaptors=True,
                 conf='log',
                 calib_params=self.calib_params
             )
@@ -346,7 +345,7 @@ class Dust3rEstimator(BaseEstimator):
                 scene.preset_intrinsics(resize_list_img_K)
 
             if est_opts['known_extrinsics']:
-                known_poses = list_img0_poses.copy() + [np.eye(4)]
+                known_poses = list_img0_poses.copy() + [torch.eye(4)]
                 pose_msk = [True] * len(list_img0_poses) + [False]
                 scene.preset_pose(known_poses=known_poses, pose_msk=pose_msk)
 
