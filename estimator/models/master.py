@@ -408,8 +408,10 @@ class Mast3rEstimator(BaseEstimator):
                     loss = global_alignment_loop(scene, niter=est_opts['two_stage_opt_niter'], schedule=self.schedule, lr=self.lr)
                     im_poses_second = scene.get_im_poses()
                     for idx in range(len(im_poses_second)):
-                        diff = np.linalg.norm(im_poses_second[idx].detach().cpu().numpy()[:3, 3].T - im_poses_first[idx].detach().cpu().numpy()[:3, 3].T)
-                        print(f"{idx}: {im_poses_first[idx].detach().cpu().numpy()[:3, 3].T} -> {im_poses_second[idx].detach().cpu().numpy()[:3, 3].T} (diff: {diff:.3f} m)")
+                        t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
+                        t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
+                        diff = np.linalg.norm(t2 - t1)
+                        print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
             ###########################
 
             self.scene = scene

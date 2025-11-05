@@ -34,34 +34,45 @@ if not hasattr(sys, "ps1"):
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([360, 640])
 
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_multisession_eval/s00000/out_map0/')
-# K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
-# im_size = np.array([360, 640])
-
 # ucl_campus
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus/map_free_eval/test/s00005/')
+# scene_root = Path('/Titan/dataset/data_litevloc/data_tro2025/map_free_eval/ucl_campus_aria/map_free_eval/test/s00006/')
 # K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
-# im_size = np.array([540, 960]) # HxW
+# im_size = np.array([576, 1024]) # HxW
 
 # map_free
 # scene_root = Path('/Titan/dataset/data_litevloc/data_tro2025/map_free_eval/mapfree/map_free_eval/val/s00460')
 # K = np.array([[547.9946, 0.0, 269.9052], [0.0, 547.9946, 352.2056], [0.0, 0.0, 1.0]])
 # im_size = np.array([720, 540]) # HxW
 
-# ucl_campus_meta_glass
-# scene_root = Path('/Titan/dataset/data_litevloc/data_tro2025/map_free_eval/ucl_campus_aria/map_free_eval/test/s00001')
-# K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
-# im_size = np.array([576, 1024]) # HxW
-
 # hkustgz_campus
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test_gray/s00000')
 # K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
 # im_size = np.array([1280, 720])
 
-# 360loc
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00004/')
+# 360loc_aria
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00002/')
 K = np.array([[444.4927, 0.0, 511.5], [0.0, 444.4927, 287.5], [0.0, 0.0, 1.0]])
 im_size = np.array([576, 1024]) # HxW
+
+# 360loc_device1
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device1/map_free_eval/test/s00004/')
+# K = np.array([[593.5669, 0.0, 512], [0.0, 593.5669, 288.0000], [0.0, 0.0, 1.0]])
+# im_size = np.array([576, 1024]) # HxW
+
+# 360loc_device2
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device2/map_free_eval/test/s00004/')
+# K = np.array([[593.5669, 0.0, 512], [0.0, 593.5669, 288.0000], [0.0, 0.0, 1.0]])
+# im_size = np.array([768, 1024]) # HxW
+
+# 360loc_device3
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device3/map_free_eval/test/s00004/')
+# K = np.array([[593.5669, 0.0, 512], [0.0, 593.5669, 288.0000], [0.0, 0.0, 1.0]])
+# im_size = np.array([768, 1024]) # HxW
+
+# 360loc_device4
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device4/map_free_eval/test/s00004/')
+# K = np.array([[444.4927, 0.0, 511.5], [0.0, 444.4927, 287.5], [0.0, 0.0, 1.0]])
+# im_size = np.array([576, 1024]) # HxW
 
 est_opts = {
     'known_extrinsics': True,
@@ -83,7 +94,7 @@ def main(args):
     for i in range(1):
         list_img0_name = [
             'seq1/frame_00000.jpg',
-            'seq1/frame_00001.jpg'
+            'seq1/frame_00001.jpg',
         ]
         list_img0_name = list_img0_name[:]
         img1_name = 'seq0/frame_00000.jpg'
@@ -110,29 +121,32 @@ def main(args):
         list_img0_intr = [{'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)} for _ in list_img0_name]
         img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
-        start_time = time.time()
-        list_img0 = [BaseEstimator.load_image(scene_root/name, (512, 288)) for name in list_img0_name]
-        img1 = BaseEstimator.load_image(scene_root/img1_name, (512, 288))
-        print(f"Loading images took {time.time() - start_time}s")
+        # start_time = time.time()
+        # list_img0 = [BaseEstimator.load_image(scene_root/name, (512, 288)) for name in list_img0_name]
+        # img1 = BaseEstimator.load_image(scene_root/img1_name, (512, 288))
+        # print(f"Loading images took {time.time() - start_time}s")
 
-        start_time = time.time()
-        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
-        print(f"Processing time: {time.time() - start_time:.2f}s")
-        print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
+        try:
+            start_time = time.time()
+            result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
+            print(f"Processing time: {time.time() - start_time:.2f}s")
+            print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
+            # print(f"Edge score: {edge_scores}")
+            # print(f"Focal length: {result['focal'][0]:.03f}")
+            # print(f"Loss: {result['loss']:.03f}")
+        except Exception as e:
+            print(f"Error: {e}")
+            pass
 
-        # print(f"Edge score: {edge_scores}")
-        # print(f"Focal length: {result['focal'][0]:.03f}")
-        # print(f"Loss: {result['loss']:.03f}")
+        msp_edges = estimator.get_minimum_spanning_tree()
+        weight_i, weight_j = estimator.scene.weight_i, estimator.scene.weight_j
+        for edge in msp_edges:
+            if edge[0] == 2 or edge[1] == 2: # confidence of the query image
+                edge_str = f"{edge[0]}_{edge[1]}"
+                conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
+                print(f"Conf of {edge_str}: {conf:.3f}")
 
-        # msp_edges = estimator.get_minimum_spanning_tree()
-        # weight_i, weight_j = estimator.scene.weight_i, estimator.scene.weight_j
-        # for edge in msp_edges:
-        #     if edge[0] == 2 or edge[1] == 2: # confidence of the query image
-        #         edge_str = f"{edge[0]}_{edge[1]}"
-        #         conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
-        #         print(f"Conf of {edge_str}: {conf:.3f}")
-
-        estimator.show_reconstruction()
+        # estimator.show_reconstruction()
 
         # Visualize results
         # result = estimator.get_matched_kpts(scene_root, list_img0[0], img1)
