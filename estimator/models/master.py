@@ -28,13 +28,12 @@ class Mast3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth")
     vit_patch_size = 16
 
-    def __init__(self, device="cpu", use_calib=False, use_lora=False, use_grey=False, *args, **kwargs):
+    def __init__(self, device="cpu", use_calib=False, *args, **kwargs):
         """Initializes the Mast3rEstimator.
 
         Args:
             device (str): Device to run the model on.
             use_calib (bool): Whether to use calibration.
-            use_lora (bool): Whether to use LoRA.
             *args: Additional arguments.
             **kwargs: Additional keyword arguments.
         """
@@ -58,18 +57,7 @@ class Mast3rEstimator(BaseEstimator):
         else:
             self.set_calib_params(None)
 
-        # Handle LoRA integration before moving to target device
-        if use_lora:
-            if 'lora_path' not in kwargs:
-                raise RuntimeError("Missing required 'lora_path' argument for LoRA integration")
-            self._safely_integrate_lora(kwargs['lora_path'], target_device=device)
-
-        if use_grey:
-            self.transform = tfm.Compose([
-                tfm.Grayscale(num_output_channels=3) # 3: to be compatible with MASt3R
-            ])
-        else:
-            self.transform = tfm.Compose([])
+        self.transform = tfm.Compose([])
 
         # Final device placement and model configuration
         self.model = self.model.to(device)

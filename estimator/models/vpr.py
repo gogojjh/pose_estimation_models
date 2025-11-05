@@ -124,10 +124,9 @@ class VPREstimator(BaseEstimator):
         faiss_index.add(db_descriptors)
         _, predictions = faiss_index.search(query_descriptors, len(list_img0_name))
 
-        # Calculate the affline combination and do pose interpolation
-        a_opt, loss = affine_combination(query_descriptors[0, :], db_descriptors[predictions[0], :])
-        est_im_pose = pose_interpolation(to_numpy(list_img0_poses), a_opt)
-        
+        # Use the pose of top-1 prediction as the estimated pose
+        est_im_pose = to_numpy(list_img0_poses[predictions[0][0]])
+
         ##### Store results for visualization
         self.scene_root = scene_root
         self.db_names = list_img0_name
@@ -138,8 +137,6 @@ class VPREstimator(BaseEstimator):
 
         ##### Get results
         est_focal = list_img0_intr[0]['K'][0][0].item()
+        # print('VPR Prediction: ', predictions[0][0]) # 1 x recall_values
 
-        print('VPR Prediction: \n', predictions) # 1 x recall_values
-        print('Affline Combination: \n', a_opt)
-
-        return est_focal, est_im_pose, loss
+        return est_focal, est_im_pose, 0.0
