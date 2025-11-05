@@ -12,6 +12,8 @@ from pathlib import Path
 import time
 import numpy as np
 import pycolmap
+import random
+import os
 
 from estimator.utils import get_image_pairs_paths
 from estimator import get_estimator, available_models
@@ -23,112 +25,51 @@ if not hasattr(sys, "ps1"):
 
 ##### Load images
 # Matterport3d
-# N_ref_image = 3
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/matterport3d/map_free_eval/test/s00001/')
+# scene_root = Path('/Titan/dataset/data_litevloc/data_tro2025/map_free_eval/matterport3d/map_free_eval/test/s00000/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([640, 360]) # WxH
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': True,
-#     'resize': 512,
-# }
 
 # Replica
-# N_ref_image = 3
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/replica/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([360, 640])
-# est_opts = {
-#     'known_extrinsics': False,
-#     'known_intrinsics': False,
-#     'resize': 512,
-# }
 
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/matterport3d/map_multisession_eval/s00000/out_map0/')
 # K = np.array([[205.46963, 0.0, 320], [0.0, 205.46963, 180], [0.0, 0.0, 1.0]])
 # im_size = np.array([360, 640])
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': True,
-#     'resize': 512,
-# }
 
 # ucl_campus
-# N_ref_image = 3
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus/map_free_eval/test/s00005/')
 # K = np.array([[504.79, 0.0, 481.30], [0.0, 542.79, 271.85], [0.0, 0.0, 1.0]])
 # im_size = np.array([540, 960]) # HxW
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': True,
-#     'resize': 512,
-# }
+
+# map_free
+# scene_root = Path('/Titan/dataset/data_litevloc/data_tro2025/map_free_eval/mapfree/map_free_eval/val/s00460')
+# K = np.array([[547.9946, 0.0, 269.9052], [0.0, 547.9946, 352.2056], [0.0, 0.0, 1.0]])
+# im_size = np.array([720, 540]) # HxW
 
 # ucl_campus_meta_glass
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/ucl_campus_aria/map_free_eval/test/s00001/')
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus_aria/s00000/out_map0')
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/ucl_campus_aria/s00000_results_in_kf_spgo_seqmatch/merge_finalmap')
+# scene_root = Path('/Titan/dataset/data_litevloc/data_tro2025/map_free_eval/ucl_campus_aria/map_free_eval/test/s00001')
 # K = np.array([[444.4927, 0.0, 511.500], [0.0, 444.4927, 287.500], [0.0, 0.0, 1.0]])
-# im_size = np.array([1024, 576])
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': False,
-#     'resize': 512,
-#     'niter': 300
-# }
+# im_size = np.array([576, 1024]) # HxW
 
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/hkust/s00000_data/5')
-K = np.array([[444.042084, 0.0, 511.500000], [0.0, 444.042084, 287.500000], [0.0, 0.0, 1.0]])
-im_size = np.array([1024, 576])
+# hkustgz_campus
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test_gray/s00000')
+# K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
+# im_size = np.array([1280, 720])
+
+# 360loc
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00004/')
+K = np.array([[444.4927, 0.0, 511.5], [0.0, 444.4927, 287.5], [0.0, 0.0, 1.0]])
+im_size = np.array([576, 1024]) # HxW
+
 est_opts = {
     'known_extrinsics': True,
     'known_intrinsics': False,
     'resize': 512,
-    'niter': 300
+    'niter': 300,
+    'two_stage_opt_niter': 50
 }
-
-# hkustgz_campus
-# N_ref_image = 2
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkustgz_campus/map_free_eval/test_gray/s00000')
-# K = np.array([[913.896, 0.0, 638.954], [0.0, 912.277, 364.884], [0.0, 0.0, 1.0]])
-# im_size = np.array([1280, 720])
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': True,
-#     'resize': 512,
-# }
-
-# 360Loc
-# N_ref_image = 12
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/360loc/map_free_eval/test/s00000_test/')
-# K = np.array([[1055.911, 0.0, 939.453], [0.0, 1052.383, 603.812], [0.0, 0.0, 1.0]])
-# im_size = np.array([1200, 1920])
-# est_opts = {
-#     'known_extrinsics': False,
-#     'known_intrinsics': False,
-#     'resize': 512,
-# }
-
-# Wildscene
-# N_ref_image = 3
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/wildscene/map_free_eval/test/s00000_test/')
-# K = np.array([[1322.75469666, 0.0, 1014.8117275], [0.0, 1321.88964261, 752.801443314], [0.0, 0.0, 1.0]])
-# im_size = np.array([1512, 2016])
-# est_opts = {
-#     'known_extrinsics': False,
-#     'known_intrinsics': False,
-#     'resize': 512,
-# }
-    
-# N_ref_image = 3
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00021')
-# K = np.array([[444.042, 0.0, 511.5], [0.0, 444.042, 287.5], [0.0, 0.0, 1.0]])
-# im_size = np.array([1024, 576]) # WxH
-# est_opts = {
-#     'known_extrinsics': True,
-#     'known_intrinsics': False,
-#     'resize': 512,
-# }
 
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
@@ -140,8 +81,13 @@ def main(args):
     )
     estimator.verbose = True
     for i in range(1):
-        list_img0_name = ['seq/000039.color.jpg', 'seq/000040.color.jpg']
-        img1_name = '../8/seq/000076.color.jpg'
+        list_img0_name = [
+            'seq1/frame_00000.jpg',
+            'seq1/frame_00001.jpg'
+        ]
+        list_img0_name = list_img0_name[:]
+        img1_name = 'seq0/frame_00000.jpg'
+
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
             for line in f.readlines():
@@ -164,44 +110,48 @@ def main(args):
         list_img0_intr = [{'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)} for _ in list_img0_name]
         img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
 
-        list_img0 = [BaseEstimator.load_image(scene_root/name, (512, 288), color_correct=True) for name in list_img0_name]
-        img1 = BaseEstimator.load_image(scene_root/img1_name, (512, 288), color_correct=True)
+        start_time = time.time()
+        list_img0 = [BaseEstimator.load_image(scene_root/name, (512, 288)) for name in list_img0_name]
+        img1 = BaseEstimator.load_image(scene_root/img1_name, (512, 288))
+        print(f"Loading images took {time.time() - start_time}s")
 
         start_time = time.time()
-        result = estimator(scene_root, list_img0, img1, list_img0_poses, list_img0_intr, img1_intr, est_opts)
+        result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
         print(f"Processing time: {time.time() - start_time:.2f}s")
+        print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
+
         # print(f"Edge score: {edge_scores}")
         # print(f"Focal length: {result['focal'][0]:.03f}")
-        # print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
         # print(f"Loss: {result['loss']:.03f}")
 
-        msp_edges = estimator.get_minimum_spanning_tree()
-        weight_i, weight_j = estimator.scene.weight_i, estimator.scene.weight_j
-        for edge in msp_edges:
-            if edge[0] == 2 or edge[1] == 2: # confidence of the query image
-                edge_str = f"{edge[0]}_{edge[1]}"
-                conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
-                print(f"Conf of {edge_str}: {conf:.3f}")
+        # msp_edges = estimator.get_minimum_spanning_tree()
+        # weight_i, weight_j = estimator.scene.weight_i, estimator.scene.weight_j
+        # for edge in msp_edges:
+        #     if edge[0] == 2 or edge[1] == 2: # confidence of the query image
+        #         edge_str = f"{edge[0]}_{edge[1]}"
+        #         conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
+        #         print(f"Conf of {edge_str}: {conf:.3f}")
 
         estimator.show_reconstruction()
 
         # Visualize results
-        result = estimator.get_matched_kpts(scene_root, list_img0[0], img1)
-        print(f"Number of inliers: {result['num_inliers']}")
+        # result = estimator.get_matched_kpts(scene_root, list_img0[0], img1)
+        # print(f"Number of inliers: {result['num_inliers']}")
+        # exit()
 
-        import open3d as o3d
-        all_pts3d = estimator.scene.get_pts3d() # all pts3d in the world frame
-        msk_conf = estimator.scene.get_masks()
-        # pts3d_flat = all_pts3d[0][msk_conf[0]].reshape(-1, 3)
-        pts3d_flat = all_pts3d[0].reshape(-1, 3)
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
-        o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_0.pcd', pcd)
-        # pts3d_flat = all_pts3d[1][msk_conf[1]].reshape(-1, 3)
-        pts3d_flat = all_pts3d[1].reshape(-1, 3)
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
-        o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_1.pcd', pcd)
+        # import open3d as o3d
+        # all_pts3d = estimator.scene.get_pts3d() # all pts3d in the world frame
+        # msk_conf = estimator.scene.get_masks()
+        # # pts3d_flat = all_pts3d[0][msk_conf[0]].reshape(-1, 3)
+        # pts3d_flat = all_pts3d[0].reshape(-1, 3)
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
+        # o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_0.pcd', pcd)
+        # # pts3d_flat = all_pts3d[1][msk_conf[1]].reshape(-1, 3)
+        # pts3d_flat = all_pts3d[1].reshape(-1, 3)
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
+        # o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_1.pcd', pcd)
 
         # DEBUG(gogojjh):
         # import cv2
@@ -218,7 +168,6 @@ def main(args):
         # list_depth_img_name = ['seq1/frame_00019.pdepth.png', 'seq1/frame_00019.pdepth.png', 'seq1/frame_00021.pdepth.png']
         # save_img_dir = "/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00021/preds"
         # estimator.save_results(save_img_dir, scene_root, list_depth_img_name, 0)
-
 
 def parse_args():
     parser = argparse.ArgumentParser(

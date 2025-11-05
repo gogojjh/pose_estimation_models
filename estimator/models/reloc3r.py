@@ -19,13 +19,12 @@ class Reloc3rEstimator(BaseEstimator):
     model_path = WEIGHTS_DIR.joinpath("reloc3r-512.pth")
     vit_patch_size = 16
 
-    def __init__(self, device="cpu", model_args="512", use_lora=False, *args, **kwargs):
+    def __init__(self, device="cpu", model_args="512", *args, **kwargs):
         """Initializes the Reloc3rEstimator.
 
         Args:
             device (str): Device to run the model on.
             model_args (str): Model arguments.
-            use_lora (bool): Whether to use LoRA.
             *args: Additional arguments.
             **kwargs: Additional keyword arguments.
         """
@@ -41,12 +40,6 @@ class Reloc3rEstimator(BaseEstimator):
         self.model = Reloc3rRelpose()
         self.model.load_state_dict(model_weights)
         print(f'Model Parameters: {sum(p.numel() for p in self.model.parameters()):,}')
-
-        # Handle LoRA integration before moving to target device
-        if use_lora:
-            if 'lora_path' not in kwargs:
-                raise RuntimeError("Missing required 'lora_path' argument for LoRA integration")
-            self._safely_integrate_lora(kwargs['lora_path'], target_device=device)
 
         self.model.to(device)
         self.model.eval()

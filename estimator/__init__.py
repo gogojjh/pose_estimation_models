@@ -20,10 +20,11 @@ available_models = [
     "hloc_superpoint_splg",
     "vpr_cosplace_resnet18_256",
     "vpr_netvlad_resnet18_4096",
+    "duster",
+    "master",
+    "reloc3r",
     "duster_{nocalib, calib}_pretrain",
-    "duster_calib_pretrain",
-    "master_{nocalib, calib}_pretrain",
-    "reloc3r_pretrain",
+    "master_{nocalib, calib}_pretrain"
 ]
 
 def get_version(pkg):

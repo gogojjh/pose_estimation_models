@@ -17,8 +17,8 @@ from dust3r.image_pairs import make_pairs
 from dust3r.utils.image import load_images
 from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from dust3r.cloud_opt.commons import edge_str
-from dust3r.lora import LoraLayer, inject_lora
 import dust3r.cloud_opt.init_im_poses as init_fun
+from dust3r.cloud_opt.base_opt import global_alignment_loop
 
 from typing import Union, List, Tuple, Dict
 from pathlib import Path
@@ -52,7 +52,7 @@ class Mast3rEstimator(BaseEstimator):
         # Set default calib_params
         if use_calib:
             print('Use calibrated confidence map and weight optimization')
-            calib_params = dict(mu=5.0, conf_thre=0.5, pseudo_gt_thre=0.0, use_weight_opt=True, use_alt_opt=False)
+            calib_params = dict(mu=5.0, conf_thre=0.5, pseudo_gt_thre=0.0, use_weight_opt=True)
             self.set_calib_params(calib_params)
         else:
             self.set_calib_params(None)
@@ -71,46 +71,47 @@ class Mast3rEstimator(BaseEstimator):
         """
         self.calib_params = new_calib_params
 
-    # Loading another lora params on-the-fly
-    def _safely_integrate_lora(self, lora_path: str, target_device: str):
-        """Safely integrates LoRA weights with CPU-based processing to prevent CUDA errors.
+    ##### NOTE(gogojjh): Not used for now
+    # # Loading another lora params on-the-fly
+    # def _safely_integrate_lora(self, lora_path: str, target_device: str):
+    #     """Safely integrates LoRA weights with CPU-based processing to prevent CUDA errors.
 
-        Args:
-            lora_path (str): Path to LoRA weights file.
-            target_device (str): Original device for the model (preserves device context).
-        """
-        # Store original device and force CPU context
-        # original_device = next(self.model.parameters()).device
-        self.model = self.model.to('cpu')
+    #     Args:
+    #         lora_path (str): Path to LoRA weights file.
+    #         target_device (str): Original device for the model (preserves device context).
+    #     """
+    #     # Store original device and force CPU context
+    #     # original_device = next(self.model.parameters()).device
+    #     self.model = self.model.to('cpu')
 
-        # Phase 1: Inject LoRA adapters
-        for name, module in self.model.named_modules():
-            if any(n in name.split('.') for n in ['qkv']) and isinstance(module, torch.nn.Linear):
-                inject_lora(self.model, name, module)
+    #     # Phase 1: Inject LoRA adapters
+    #     for name, module in self.model.named_modules():
+    #         if any(n in name.split('.') for n in ['qkv']) and isinstance(module, torch.nn.Linear):
+    #             inject_lora(self.model, name, module)
 
-        # Phase 2: Load LoRA weights
-        try:
-            lora_weights = torch.load(lora_path, map_location='cpu')
-            self.model.load_state_dict(lora_weights, strict=False)
-            print(f'LoRA Parameters: {sum(v.numel() for v in lora_weights.values()):,}')
-        except Exception as e:
-            raise RuntimeError(f"LoRA integration failed: {str(e)}")
+    #     # Phase 2: Load LoRA weights
+    #     try:
+    #         lora_weights = torch.load(lora_path, map_location='cpu')
+    #         self.model.load_state_dict(lora_weights, strict=False)
+    #         print(f'LoRA Parameters: {sum(v.numel() for v in lora_weights.values()):,}')
+    #     except Exception as e:
+    #         raise RuntimeError(f"LoRA integration failed: {str(e)}")
 
-        # Phase 3: Merge LoRA weights into base model
-        for name, module in self.model.named_modules():
-            if isinstance(module, LoraLayer):
-                parent = self.model
-                # Traverse module hierarchy: a.b.c → getattr(a, 'b')
-                for component in name.split('.')[:-1]:
-                    parent = getattr(parent, component)
+    #     # Phase 3: Merge LoRA weights into base model
+    #     for name, module in self.model.named_modules():
+    #         if isinstance(module, LoraLayer):
+    #             parent = self.model
+    #             # Traverse module hierarchy: a.b.c → getattr(a, 'b')
+    #             for component in name.split('.')[:-1]:
+    #                 parent = getattr(parent, component)
 
-                # Mathematical merge: W' = W + (A*B)*(α/r)
-                lora_weight = ((module.lora_a @ module.lora_b) * module.alpha / module.r).T
-                merged_weight = module.raw_linear.weight + lora_weight
-                module.raw_linear.weight.data.copy_(merged_weight)
+    #             # Mathematical merge: W' = W + (A*B)*(α/r)
+    #             lora_weight = ((module.lora_a @ module.lora_b) * module.alpha / module.r).T
+    #             merged_weight = module.raw_linear.weight + lora_weight
+    #             module.raw_linear.weight.data.copy_(merged_weight)
 
-                # Replace composite layer with merged linear layer
-                setattr(parent, name.split('.')[-1], module.raw_linear)
+    #             # Replace composite layer with merged linear layer
+    #             setattr(parent, name.split('.')[-1], module.raw_linear)
 
     @staticmethod
     def download_weights():
@@ -349,8 +350,6 @@ class Mast3rEstimator(BaseEstimator):
                 verbose=self.verbose
             )
             loss = 0.0
-
-            # Get results
             self.scene = scene
             return None, None, loss
         # GlobalAlignerMode.PointCloudOptimizer
@@ -398,12 +397,26 @@ class Mast3rEstimator(BaseEstimator):
                 schedule=self.schedule,
                 lr=self.lr
             )
+
+            ###########################
+            # Perform two-stage optimization to adjust the noisy poses
+            if est_opts['known_extrinsics']:
+                if 'two_stage_opt_niter' in est_opts and est_opts['two_stage_opt_niter'] > 0:
+                    im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
+                    for pose_param in scene.im_poses:
+                        pose_param.requires_grad_(True)
+                    loss = global_alignment_loop(scene, niter=est_opts['two_stage_opt_niter'], schedule=self.schedule, lr=self.lr)
+                    im_poses_second = scene.get_im_poses()
+                    for idx in range(len(im_poses_second)):
+                        diff = np.linalg.norm(im_poses_second[idx].detach().cpu().numpy()[:3, 3].T - im_poses_first[idx].detach().cpu().numpy()[:3, 3].T)
+                        print(f"{idx}: {im_poses_first[idx].detach().cpu().numpy()[:3, 3].T} -> {im_poses_second[idx].detach().cpu().numpy()[:3, 3].T} (diff: {diff:.3f} m)")
+            ###########################
+
             self.scene = scene
-            
             focals, im_poses = scene.get_focals(), scene.get_im_poses()
             est_focal = focals[-1].detach()
             est_im_pose = im_poses[-1].detach()
-            
+
             return est_focal, est_im_pose, loss
                 
     def save_results(self):
