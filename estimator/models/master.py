@@ -5,7 +5,7 @@ import py3_wget
 import numpy as np
 
 from estimator import BaseEstimator, WEIGHTS_DIR, THIRD_PARTY_DIR
-from estimator.utils import resize_to_divisible, add_to_path
+from estimator.utils import resize_to_divisible, add_to_path, to_numpy
 
 add_to_path(THIRD_PARTY_DIR.joinpath("mast3r"))
 
@@ -19,6 +19,7 @@ from dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from dust3r.cloud_opt.commons import edge_str
 import dust3r.cloud_opt.init_im_poses as init_fun
 from dust3r.cloud_opt.base_opt import global_alignment_loop
+
 
 from typing import Union, List, Tuple, Dict
 from pathlib import Path
@@ -57,8 +58,6 @@ class Mast3rEstimator(BaseEstimator):
             self.set_calib_params(calib_params)
         else:
             self.set_calib_params(None)
-
-        self.transform = tfm.Compose([])
 
         # Final device placement and model configuration
         self.model = self.model.to(device)
@@ -266,8 +265,8 @@ class Mast3rEstimator(BaseEstimator):
 
         Args:
             scene_root (str): The root directory of the scene.
-            list_img0_name (list): A list of image names for the reference images.
-            img1_name (str): The name of the target image.
+            list_img0 (list): A list of image names for the reference images.
+            img1 (str): The name of the target image.
             list_img0_poses (list): A list of poses for the reference images.
             list_img0_intr (list): A list of intrinsic camera matrices for the reference images.
             img1_intr (dict): The intrinsic camera matrix for the target image.
@@ -278,38 +277,24 @@ class Mast3rEstimator(BaseEstimator):
         """
         self.niter = est_opts.get('niter', self.niter)
         self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', self.two_stage_opt_niter)
-        num_img_input = len(list_img0) + 1
+        self.resize = est_opts.get('resize', (512, 288))
+        self.handle_cross_device = est_opts.get('handle_cross_device', True)
 
-        # Load database images
-        if isinstance(list_img0[0], torch.Tensor) and isinstance(img1, torch.Tensor):
-            images = []
-            for img in list_img0:
-                image = {
-                    "img": self.preprocess(img)[0], 
-                    "idx": len(images), 
-                    "instance": str(len(images)), 
-                    "true_shape": np.int32([img.shape[-2:]])
-                }
-                images.append(image)
-    
-            images.append({
-                "img": self.preprocess(img1)[0], 
-                "idx": len(images), 
-                "instance": str(len(images)), 
-                "true_shape": np.int32([img.shape[-2:]])
-            })
-        else:
-            resize = est_opts.get('resize', 512)
-            imgs_path = [str(scene_root / img_name) for img_name in list_img0 + [img1]]
-            images = load_images(imgs_path, size=resize, verbose=self.verbose)
+        ##### Load database images
+        if isinstance(list_img0[0], str) and isinstance(img1, str):
+            if self.handle_cross_device:
+                dest_size = to_numpy(list_img0_intr[0]['im_size'])
+            else:
+                dest_size = to_numpy(img1_intr['im_size'])
+            list_img0 = [BaseEstimator.load_image(scene_root/name, resize=self.resize) for name in list_img0]
+            img1 = BaseEstimator.load_image(scene_root/img1, resize=self.resize, dest_size=dest_size)
 
-        # Preprocess images (convert into gray image)
-        for image in images: 
-            image['img'] = self.transform(image['img'])
+        images = [{"img": self.preprocess(img)[0], "idx": i, "instance": str(i), "true_shape": np.int32([img.shape[-2:]])} 
+                  for i, img in enumerate(list_img0 + [img1])]
 
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
-        assert num_img_input == len(images)
 
+        ##### Start inference
         # NOTE(gogojjh): At this stage, you have the raw dust3r predictions
         # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
         #  -> because we symmetrize we have (im1, im2) and (im2, im1) pairs
@@ -339,6 +324,7 @@ class Mast3rEstimator(BaseEstimator):
         # pts3d = scene.get_pts3d()[n]
         # confidence_masks = scene.get_masks()[n]
 
+        num_img_input = len(images)
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
         self.output_inference = output
 
@@ -423,6 +409,6 @@ class Mast3rEstimator(BaseEstimator):
 
             return est_focal, est_im_pose, loss
                 
-    def save_results(self):
+    def save_results(self, log_dir):
         """Saves the results (not implemented)."""
         pass

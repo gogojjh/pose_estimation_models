@@ -119,7 +119,7 @@ class Reloc3rEstimator(BaseEstimator):
 
         return est_focal, est_im_pose, loss
 
-    def save_results(self):
+    def save_results(self, log_dir):
         """Saves the results (not implemented)."""
         pass  # Placeholder, not implemented in this version
 

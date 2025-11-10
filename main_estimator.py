@@ -20,8 +20,8 @@ from estimator import get_estimator, available_models
 from estimator import BaseEstimator
 
 # This is to be able to use matplotlib also without a GUI
-if not hasattr(sys, "ps1"):
-    matplotlib.use("Agg")
+# if not hasattr(sys, "ps1"):
+#     matplotlib.use("Agg")
 
 ##### Load images
 # Matterport3d
@@ -50,37 +50,73 @@ if not hasattr(sys, "ps1"):
 # im_size = np.array([1280, 720])
 
 # 360loc_aria
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00002/')
-K = np.array([[444.4927, 0.0, 511.5], [0.0, 444.4927, 287.5], [0.0, 0.0, 1.0]])
-im_size = np.array([576, 1024]) # HxW
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00002/')
 
 # 360loc_device1
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device1/map_free_eval/test/s00004/')
-# K = np.array([[593.5669, 0.0, 512], [0.0, 593.5669, 288.0000], [0.0, 0.0, 1.0]])
-# im_size = np.array([576, 1024]) # HxW
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device1/map_free_eval/test/s00002/')
 
 # 360loc_device2
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device2/map_free_eval/test/s00004/')
-# K = np.array([[593.5669, 0.0, 512], [0.0, 593.5669, 288.0000], [0.0, 0.0, 1.0]])
-# im_size = np.array([768, 1024]) # HxW
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device2/map_free_eval/test/s00002/')
 
 # 360loc_device3
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device3/map_free_eval/test/s00004/')
-# K = np.array([[593.5669, 0.0, 512], [0.0, 593.5669, 288.0000], [0.0, 0.0, 1.0]])
-# im_size = np.array([768, 1024]) # HxW
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device3/map_free_eval/test/s00002/')
 
 # 360loc_device4
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device4/map_free_eval/test/s00004/')
-# K = np.array([[444.4927, 0.0, 511.5], [0.0, 444.4927, 287.5], [0.0, 0.0, 1.0]])
-# im_size = np.array([576, 1024]) # HxW
+# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device4/map_free_eval/test/s00000/')
 
 est_opts = {
     'known_extrinsics': True,
     'known_intrinsics': False,
-    'resize': 512,
     'niter': 300,
-    'two_stage_opt_niter': 50
+    'two_stage_opt_niter': 50,
+    'handle_cross_device': True,
+    'resize': (512, 288),
 }
+
+def visualize_images(images):
+    """
+    Visualize list of images and a query image using matplotlib.
+    
+    Args:
+        images: List of images (can be torch.Tensor or numpy arrays)
+        img1: Query image (can be torch.Tensor or numpy array)
+    """
+    import matplotlib.pyplot as plt
+    
+    num_img0 = len(images) - 1
+    fig, axs = plt.subplots(1, num_img0 + 1, figsize=(5 * (num_img0 + 1), 5))
+    # Ensure axs is always iterable
+    if (num_img0 + 1) == 1:
+        axs = [axs]
+
+    for i, img in enumerate(images[:-1]):
+        if isinstance(img, torch.Tensor):
+            img_vis = img.detach().cpu().numpy()
+            if img_vis.shape[0] in (1, 3):  # CHW
+                img_vis = np.transpose(img_vis, (1,2,0))
+            if img_vis.shape[2] == 1:
+                img_vis = img_vis[..., 0]
+        else:
+            img_vis = img
+        axs[i].imshow(img_vis.astype(np.uint8) if img_vis.max() > 1 else img_vis)
+        axs[i].axis('off')
+        axs[i].set_title(f'image[{i}]')
+
+    # Handle img1
+    if isinstance(images[-1], torch.Tensor):
+        img1_vis = images[-1].detach().cpu().numpy()
+        if img1_vis.shape[0] in (1, 3):
+            img1_vis = np.transpose(img1_vis, (1,2,0))
+        if img1_vis.shape[2] == 1:
+            img1_vis = img1_vis[..., 0]
+    else:
+        img1_vis = images[-1]
+    axs[-1].imshow(img1_vis.astype(np.uint8) if img1_vis.max() > 1 else img1_vis)
+    axs[-1].axis('off')
+    axs[-1].set_title('image[-1]')
+
+    plt.tight_layout()
+    plt.show()
 
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
@@ -91,7 +127,9 @@ def main(args):
         out_dir=args.out_dir
     )
     estimator.verbose = True
+
     for i in range(1):
+        ##### Set image names
         list_img0_name = [
             'seq1/frame_00000.jpg',
             'seq1/frame_00001.jpg',
@@ -99,6 +137,7 @@ def main(args):
         list_img0_name = list_img0_name[:]
         img1_name = 'seq0/frame_00000.jpg'
 
+        ##### Load poses and intrinsics
         poses_load = {}
         with (scene_root / 'poses.txt').open('r') as f:
             for line in f.readlines():
@@ -111,26 +150,39 @@ def main(args):
                 pose.rotation = pycolmap.Rotation3d(np.roll(qt[:4], -1))
                 poses_load[img_name] = pose
 
-        # Pose from world to camera
-        list_img0_poses = []
+        intr_load = {}
+        with (scene_root / 'intrinsics.txt').open('r') as f:
+            for line in f.readlines():
+                if '#' in line: continue
+                line = line.strip().split(' ')
+                img_name = line[0]
+                fx, fy, cx, cy, W, H = map(float, line[1:])
+                intr_load[img_name] = {'K': np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]]), 'im_size': np.array([W, H])}
+
+        list_img0_poses = [] # Pose from world to camera
         for name in list_img0_name:
             pose = np.eye(4)
             pose[:3, :] = poses_load[name].matrix()
             list_img0_poses.append(torch.from_numpy(np.linalg.inv(pose)))
 
-        list_img0_intr = [{'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)} for _ in list_img0_name]
-        img1_intr = {'K': torch.from_numpy(K), 'im_size': torch.from_numpy(im_size)}
+        list_img0_intr = [{'K': torch.from_numpy(intr_load[name]['K']), 'im_size': torch.from_numpy(intr_load[name]['im_size'])} for name in list_img0_name]
+        img1_intr = {'K': torch.from_numpy(intr_load[img1_name]['K']), 'im_size': torch.from_numpy(intr_load[img1_name]['im_size'])}
 
-        # start_time = time.time()
-        # list_img0 = [BaseEstimator.load_image(scene_root/name, (512, 288)) for name in list_img0_name]
-        # img1 = BaseEstimator.load_image(scene_root/img1_name, (512, 288))
-        # print(f"Loading images took {time.time() - start_time}s")
+        ##### Check if the intrinsics are the same
+        # if est_opts['handle_cross_device']:
+        #     dest_size = intr_load[list_img0_name[0]]['im_size']
+        # else:
+        #     dest_size = intr_load[img1_name]['im_size']
+        # list_img0 = [BaseEstimator.load_image(scene_root/name, resize=(512, 288)) for name in list_img0_name]
+        # img1 = BaseEstimator.load_image(scene_root/img1_name, resize=(512, 288), dest_size=dest_size)
+        # visualize_images(list_img0 + [img1])
 
+        ##### Perform pose estimation
         try:
             start_time = time.time()
             result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
             print(f"Processing time: {time.time() - start_time:.2f}s")
-            print(f"Estimated pose: {result['im_pose'][:3, 3:4].T}") # Pose from world to camera
+            print(f"Estimated pose_w2c: {result['im_pose'][:3, 3:4].T}")
             # print(f"Edge score: {edge_scores}")
             # print(f"Focal length: {result['focal'][0]:.03f}")
             # print(f"Loss: {result['loss']:.03f}")
@@ -146,42 +198,7 @@ def main(args):
                 conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
                 print(f"Conf of {edge_str}: {conf:.3f}")
 
-        # estimator.show_reconstruction()
-
-        # Visualize results
-        # result = estimator.get_matched_kpts(scene_root, list_img0[0], img1)
-        # print(f"Number of inliers: {result['num_inliers']}")
-        # exit()
-
-        # import open3d as o3d
-        # all_pts3d = estimator.scene.get_pts3d() # all pts3d in the world frame
-        # msk_conf = estimator.scene.get_masks()
-        # # pts3d_flat = all_pts3d[0][msk_conf[0]].reshape(-1, 3)
-        # pts3d_flat = all_pts3d[0].reshape(-1, 3)
-        # pcd = o3d.geometry.PointCloud()
-        # pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
-        # o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_0.pcd', pcd)
-        # # pts3d_flat = all_pts3d[1][msk_conf[1]].reshape(-1, 3)
-        # pts3d_flat = all_pts3d[1].reshape(-1, 3)
-        # pcd = o3d.geometry.PointCloud()
-        # pcd.points = o3d.utility.Vector3dVector(pts3d_flat.detach().cpu().numpy())
-        # o3d.io.write_point_cloud('/Rocket_ssd/dataset/tmp/estimator_1.pcd', pcd)
-
-        # DEBUG(gogojjh):
-        # import cv2
-        # new_size = tuple((1024, 576)) # WxH
-        # depth_maps = estimator.scene.get_depthmaps()
-        # depth_map = (depth_maps[0].detach().cpu().numpy() * 1000.0).astype(np.uint16)
-        # re_depth = cv2.resize(depth_map, new_size, interpolation=cv2.INTER_NEAREST)
-        # cv2.imwrite('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00015/seq1/frame_00010.pdepth.png', re_depth)
-        # depth_map = (depth_maps[1].detach().cpu().numpy() * 1000.0).astype(np.uint16)
-        # re_depth = cv2.resize(depth_map, new_size, interpolation=cv2.INTER_NEAREST)
-        # cv2.imwrite('/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00015/seq1/frame_00014.pdepth.png', re_depth)
-
-        # DEBUG(gogojjh):
-        # list_depth_img_name = ['seq1/frame_00019.pdepth.png', 'seq1/frame_00019.pdepth.png', 'seq1/frame_00021.pdepth.png']
-        # save_img_dir = "/Rocket_ssd/dataset/data_litevloc/map_free_eval/hkust_aria/hkust_P000_N001/map_free_eval/train/s00021/preds"
-        # estimator.save_results(save_img_dir, scene_root, list_depth_img_name, 0)
+        estimator.show_reconstruction()
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -201,13 +218,6 @@ def parse_args():
     parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
     parser.add_argument("--no_viz", action="store_true", help="avoid saving visualizations")
     parser.add_argument("--max_num_keypoint", type=int, default=2048, help="maximum number of keypoints")
-
-    # parser.add_argument(
-    #     "--input",
-    #     type=str,
-    #     default="assets/example_pairs",
-    #     help="path to either (1) dir with dirs with image pairs or (2) txt file with two image paths per line",
-    # )
     parser.add_argument("--out_dir", type=Path, default=None, help="path where outputs are saved")
 
     args = parser.parse_args()

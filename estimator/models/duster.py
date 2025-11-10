@@ -227,8 +227,8 @@ class Dust3rEstimator(BaseEstimator):
 
         Args:
             scene_root (str): The root directory of the scene.
-            list_img0_name (list): A list of image names for the reference images.
-            img1_name (str): The name of the target image.
+            list_img0 (list): A list of image names for the reference images.
+            img1 (str): The name of the target image.
             list_img0_poses (list): A list of poses for the reference images.
             list_img0_intr (list): A list of intrinsic camera matrices for the reference images.
             img1_intr (dict): The intrinsic camera matrix for the target image.
@@ -239,38 +239,24 @@ class Dust3rEstimator(BaseEstimator):
         """
         self.niter = est_opts.get('niter', self.niter)
         self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', self.two_stage_opt_niter)
-        num_img_input = len(list_img0) + 1
+        self.resize = est_opts.get('resize', (512, 288))
+        self.handle_cross_device = est_opts.get('handle_cross_device', True)
 
-        # Load database images
-        if isinstance(list_img0[0], torch.Tensor) and isinstance(img1, torch.Tensor):
-            images = []
-            for img in list_img0:
-                image = {
-                    "img": self.preprocess(img)[0], 
-                    "idx": len(images), 
-                    "instance": str(len(images)), 
-                    "true_shape": np.int32([img.shape[-2:]])
-                }
-                images.append(image)
-    
-            images.append({
-                "img": self.preprocess(img1)[0], 
-                "idx": len(images), 
-                "instance": str(len(images)), 
-                "true_shape": np.int32([img.shape[-2:]])
-            })
-        else:
-            resize = est_opts.get('resize', 512)
-            imgs_path = [str(scene_root / img_name) for img_name in list_img0 + [img1]]
-            images = load_images(imgs_path, size=resize, verbose=self.verbose)
+        ##### Load database images
+        if isinstance(list_img0[0], str) and isinstance(img1, str):
+            if self.handle_cross_device:
+                dest_size = to_numpy(list_img0_intr[0]['im_size'])
+            else:
+                dest_size = to_numpy(img1_intr['im_size'])
+            list_img0 = [BaseEstimator.load_image(scene_root/name, resize=self.resize) for name in list_img0]
+            img1 = BaseEstimator.load_image(scene_root/img1, resize=self.resize, dest_size=dest_size)
 
-        # Preprocess images (convert into gray image)
-        for image in images: 
-            image['img'] = self.transform(image['img'])
+        images = [{"img": self.preprocess(img)[0], "idx": i, "instance": str(i), "true_shape": np.int32([img.shape[-2:]])} 
+                  for i, img in enumerate(list_img0 + [img1])]
 
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
-        assert num_img_input == len(images)
 
+        ##### Start inference
         # NOTE(gogojjh): At this stage, you have the raw dust3r predictions
         # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
         #  -> because we symmetrize we have (im1, im2) and (im2, im1) pairs
@@ -293,6 +279,7 @@ class Dust3rEstimator(BaseEstimator):
         #   pred1['pts3d', 'conf', 'desc', 'desc_conf'])
         #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view'])
         
+        num_img_input = len(images)
         output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
         self.output_inference = output
 
@@ -376,15 +363,19 @@ class Dust3rEstimator(BaseEstimator):
             est_im_pose = im_poses[-1].detach()
             
             return est_focal, est_im_pose, loss
-                       
-    def save_results(self, save_log, scene_root, list_depth_img_name, indice):
-        fig0 = self.visualize_weights_errors()
-        fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)
-        if indice % 5 == 0:
-            fig0.savefig(os.path.join(save_log, f"img_weight_error_{indice}.jpg"))
-            fig1.savefig(os.path.join(save_log, f"depth_alignment_{indice}.jpg"))
-        plt.close(fig0)
-        plt.close(fig1)
 
-        return avg_depth_error, corr_score
+    def save_results(self, log_dir):
+        """Saves the results (not implemented)."""
+        pass
+
+    # def save_results(self, save_log, scene_root, list_depth_img_name, indice):
+    #     fig0 = self.visualize_weights_errors()
+    #     fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)
+    #     if indice % 5 == 0:
+    #         fig0.savefig(os.path.join(save_log, f"img_weight_error_{indice}.jpg"))
+    #         fig1.savefig(os.path.join(save_log, f"depth_alignment_{indice}.jpg"))
+    #     plt.close(fig0)
+    #     plt.close(fig1)
+
+    #     return avg_depth_error, corr_score
 

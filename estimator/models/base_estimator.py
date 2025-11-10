@@ -83,8 +83,8 @@ class BaseEstimator(torch.nn.Module):
     @staticmethod
     def load_image(
         path: Union[str, Path], 
-        resize: Union[int, Tuple] = None, # WxH e.g., 512x288
-        color_correct = False
+        resize: Union[int, Tuple] = None, # WxH e.g., 512x288,
+        dest_size: Union[Tuple] = None # WxH e.g., 1024x576
     ) -> torch.Tensor:
 
         if isinstance(resize, int):
@@ -97,13 +97,18 @@ class BaseEstimator(torch.nn.Module):
             new_size = (resize[1], resize[0]) # HxW
             transformations.append(tfm.Resize(size=new_size, antialias=True))
 
-        if color_correct:
-            transformations.append(ColorCorrection(comp_blue=0.95))
-
         transform = tfm.Compose(transformations)
 
         # Load image and apply transformation
         pil_img = Image.open(path).convert("RGB")
+        if dest_size is not None:
+            crop_w, crop_h = dest_size
+            img_w, img_h = pil_img.size
+            if crop_w > img_w or crop_h > img_h:
+                new_img = Image.new("RGB", (crop_w, crop_h))
+                new_img.paste(pil_img, (0, 0))
+                pil_img = new_img
+            pil_img = pil_img.crop((0, 0, crop_w, crop_h))
         # tensor_size1 = (pil_img.size[1], pil_img.size[0]) # HXW
 
         img = transform(np.array(pil_img))
