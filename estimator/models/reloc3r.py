@@ -98,7 +98,7 @@ class Reloc3rEstimator(BaseEstimator):
         Returns:
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
-        resize = est_opts.get('resize', 512)
+        resize = 512            
         imgs_path = [str(scene_root / img_name) for img_name in list_img0_name]
         img0s_dict = load_images(imgs_path, size=resize, verbose=self.verbose) # list of dict()
         img1_dict = load_images([str(scene_root / img1_name)], size=resize, verbose=self.verbose)[0] # dict()
