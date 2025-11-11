@@ -109,6 +109,7 @@ class BaseEstimator(torch.nn.Module):
                 new_img.paste(pil_img, (0, 0))
                 pil_img = new_img
             pil_img = pil_img.crop((0, 0, crop_w, crop_h))
+            # print(f"Cropping cross-device images: {img_w}x{img_h} --> {crop_w}x{crop_h}")
         # tensor_size1 = (pil_img.size[1], pil_img.size[0]) # HXW
 
         img = transform(np.array(pil_img))

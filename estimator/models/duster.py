@@ -47,8 +47,6 @@ class Dust3rEstimator(BaseEstimator):
         # Initialize training schedule parameters
         self.schedule = 'cosine'
         self.lr = 0.01
-        self.niter = 300
-        self.two_stage_opt_niter = 50
         
         # Load base model weights
         self.download_weights()
@@ -58,7 +56,7 @@ class Dust3rEstimator(BaseEstimator):
         # Set default calib_params
         if use_calib:
             print('Use calibrated confidence map and weight optimization')
-            calib_params = dict(mu=5.0, conf_thre=0.5, pseudo_gt_thre=0.0, use_weight_opt=True, use_alt_opt=False)
+            calib_params = dict(mu=5.0, conf_thre=0.0, use_weight_opt=True)
             self.set_calib_params(calib_params)
         else:
             self.set_calib_params(None)
@@ -237,14 +235,14 @@ class Dust3rEstimator(BaseEstimator):
         Returns:
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
-        self.niter = est_opts.get('niter', self.niter)
-        self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', self.two_stage_opt_niter)
+        self.niter = est_opts.get('niter', 300)
+        self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', 0)
         self.resize = est_opts.get('resize', (512, 288))
-        self.handle_cross_device = est_opts.get('handle_cross_device', True)
+        self.crop_image_to_database = est_opts.get('crop_image_to_database', False)
 
         ##### Load database images
         if isinstance(list_img0[0], str) and isinstance(img1, str):
-            if self.handle_cross_device:
+            if self.crop_image_to_database:
                 dest_size = to_numpy(list_img0_intr[0]['im_size'])
             else:
                 dest_size = to_numpy(img1_intr['im_size'])

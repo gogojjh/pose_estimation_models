@@ -44,8 +44,6 @@ class Mast3rEstimator(BaseEstimator):
 
         self.schedule = 'cosine'
         self.lr = 0.01
-        self.niter = 300
-        self.two_stage_opt_niter = 50
 
         self.download_weights()
         self.model = AsymmetricMASt3R.from_pretrained(self.model_path).to(device)
@@ -54,7 +52,7 @@ class Mast3rEstimator(BaseEstimator):
         # Set default calib_params
         if use_calib:
             print('Use calibrated confidence map and weight optimization')
-            calib_params = dict(mu=5.0, conf_thre=0.5, pseudo_gt_thre=0.0, use_weight_opt=True)
+            calib_params = dict(mu=5.0, conf_thre=0.5, use_weight_opt=True)
             self.set_calib_params(calib_params)
         else:
             self.set_calib_params(None)
@@ -275,17 +273,17 @@ class Mast3rEstimator(BaseEstimator):
         Returns:
             tuple: A tuple containing the estimated focal length, estimated image pose, and the loss value.
         """
-        self.niter = est_opts.get('niter', self.niter)
-        self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', self.two_stage_opt_niter)
+        self.niter = est_opts.get('niter', 300)
+        self.two_stage_opt_niter = est_opts.get('two_stage_opt_niter', 0)
         self.resize = est_opts.get('resize', (512, 288))
-        self.handle_cross_device = est_opts.get('handle_cross_device', True)
 
         ##### Load database images
         if isinstance(list_img0[0], str) and isinstance(img1, str):
-            if self.handle_cross_device:
-                dest_size = to_numpy(list_img0_intr[0]['im_size'])
+            self.crop_image_to_database = est_opts.get('crop_image_to_database', False)
+            if self.crop_image_to_database:
+                dest_size = to_numpy(list_img0_intr[0]['im_size']) # the img1 is cropped to the same size as the database images
             else:
-                dest_size = to_numpy(img1_intr['im_size'])
+                dest_size = to_numpy(img1_intr['im_size']) # the img1 is not cropped
             list_img0 = [BaseEstimator.load_image(scene_root/name, resize=self.resize) for name in list_img0]
             img1 = BaseEstimator.load_image(scene_root/img1, resize=self.resize, dest_size=dest_size)
 
@@ -393,7 +391,11 @@ class Mast3rEstimator(BaseEstimator):
                     im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
                     for pose_param in scene.im_poses:
                         pose_param.requires_grad_(True)
+                    
+                    if scene.calib_params is not None:
+                        scene.calib_params.update({'warmup_iters': 0})
                     loss = global_alignment_loop(scene, niter=self.two_stage_opt_niter, schedule=self.schedule, lr=self.lr)
+                    
                     im_poses_second = scene.get_im_poses()
                     for idx in range(len(im_poses_second)):
                         t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
