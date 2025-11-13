@@ -283,7 +283,7 @@ class Mast3rEstimator(BaseEstimator):
             if self.crop_image_to_database:
                 dest_size = to_numpy(list_img0_intr[0]['im_size']) # the img1 is cropped to the same size as the database images
             else:
-                dest_size = to_numpy(img1_intr['im_size']) # the img1 is not cropped
+                dest_size = to_numpy(img1_intr['im_size'])         # the img1 is not cropped to the same size as the database images
             list_img0 = [BaseEstimator.load_image(scene_root/name, resize=self.resize) for name in list_img0]
             img1 = BaseEstimator.load_image(scene_root/img1, resize=self.resize, dest_size=dest_size)
 
@@ -347,6 +347,7 @@ class Mast3rEstimator(BaseEstimator):
                 verbose=self.verbose,
                 dist='l1',
                 conf='log',
+                allow_pw_adaptors=True,
                 calib_params=self.calib_params
             )
 
@@ -389,19 +390,20 @@ class Mast3rEstimator(BaseEstimator):
             if est_opts['known_extrinsics']:
                 if self.two_stage_opt_niter > 0:
                     im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
+                    
                     for pose_param in scene.im_poses:
                         pose_param.requires_grad_(True)
-                    
                     if scene.calib_params is not None:
                         scene.calib_params.update({'warmup_iters': 0})
+                    
                     loss = global_alignment_loop(scene, niter=self.two_stage_opt_niter, schedule=self.schedule, lr=self.lr)
                     
-                    im_poses_second = scene.get_im_poses()
-                    for idx in range(len(im_poses_second)):
-                        t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
-                        t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
-                        diff = np.linalg.norm(t2 - t1)
-                        print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
+                    # im_poses_second = scene.get_im_poses()
+                    # for idx in range(len(im_poses_second)):
+                    #     t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
+                    #     t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
+                    #     diff = np.linalg.norm(t2 - t1)
+                    #     print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
             ###########################
 
             self.scene = scene

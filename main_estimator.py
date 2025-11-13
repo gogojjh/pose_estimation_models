@@ -52,11 +52,10 @@ from estimator import BaseEstimator
 # im_size = np.array([1280, 720])
 
 # 360loc_aria
-# scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00002/')
+scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_aria/map_free_eval/test/s00019/')
 
 # 360loc_device1
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device1/map_free_eval/test/s00000/')
-scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_multisession_eval/360loc/s00002_hall_results_in_kf_spgo_cc_seqmatch_master/merge_0_1/')
 
 # 360loc_device2
 # scene_root = Path('/Rocket_ssd/dataset/data_litevloc/map_free_eval/360loc_device2/map_free_eval/test/s00001/')
@@ -131,9 +130,9 @@ def visualize_optimization_analysis(scene, out_dir, warmup_iters=None):
         out_dir: Directory to save visualizations
         warmup_iters: Number of warmup iterations (if used)
     """
-    print("\n" + "="*70)
-    print("📊 OPTIMIZATION ANALYSIS & VISUALIZATION")
-    print("="*70)
+    # print("\n" + "="*70)
+    # print("📊 OPTIMIZATION ANALYSIS & VISUALIZATION")
+    # print("="*70)
     
     out_dir = Path(out_dir)
     out_dir.mkdir(exist_ok=True, parents=True)
@@ -142,8 +141,8 @@ def visualize_optimization_analysis(scene, out_dir, warmup_iters=None):
     # 1. LOSS CURVE ANALYSIS - Why warmup matters
     # ========================================================================
     if hasattr(scene, 'loss_log') and len(scene.loss_log) > 0:
-        print("\n1️⃣ Loss Curve Analysis (Warmup Importance)")
-        print("-"*70)
+        # print("\n1️⃣ Loss Curve Analysis (Warmup Importance)")
+        # print("-"*70)
         
         fig = plt.figure(figsize=(16, 10))
         gs = GridSpec(3, 3, figure=fig, hspace=0.3, wspace=0.3)
@@ -231,31 +230,32 @@ def visualize_optimization_analysis(scene, out_dir, warmup_iters=None):
             ax5.legend(fontsize=10)
         
         plt.savefig(out_dir / 'optimization_loss_analysis.png', dpi=150, bbox_inches='tight')
-        print(f"✅ Saved: {out_dir / 'optimization_loss_analysis.png'}")
+        # print(f"✅ Saved: {out_dir / 'optimization_loss_analysis.png'}")
         
         # Print statistics
-        print(f"\n📈 Loss Statistics:")
-        print(f"   Initial loss: {losses[0]:.6f}")
-        print(f"   Final loss: {losses[-1]:.6f}")
-        print(f"   Reduction: {(losses[0] - losses[-1])/losses[0]*100:.2f}%")
+        # print(f"\n📈 Loss Statistics:")
+        # print(f"   Initial loss: {losses[0]:.6f}")
+        # print(f"   Final loss: {losses[-1]:.6f}")
+        # print(f"   Reduction: {(losses[0] - losses[-1])/losses[0]*100:.2f}%")
         if warmup_iters and warmup_iters < len(losses):
-            print(f"   Loss at warmup end: {losses[warmup_iters]:.6f}")
-            print(f"   Warmup reduction: {(losses[0] - losses[warmup_iters])/losses[0]*100:.2f}%")
+            # print(f"   Loss at warmup end: {losses[warmup_iters]:.6f}")
+            # print(f"   Warmup reduction: {(losses[0] - losses[warmup_iters])/losses[0]*100:.2f}%")
+            pass
         
         plt.close()
     
     # ========================================================================
     # 2. CONFIDENCE & WEIGHT MAP ANALYSIS - Outlier rejection
     # ========================================================================
-    print("\n2️⃣ Confidence & Weight Map Analysis (Outlier Rejection)")
-    print("-"*70)
+    # print("\n2️⃣ Confidence & Weight Map Analysis (Outlier Rejection)")
+    # print("-"*70)
     
     if hasattr(scene, 'weight_i') and hasattr(scene, 'conf_i'):
         # Analyze first edge (you can loop through all edges if needed)
         edge_keys = list(scene.weight_i.keys())
         
         for idx, edge_key in enumerate(edge_keys[:min(3, len(edge_keys))]):  # Show up to 3 edges
-            print(f"\n🔗 Analyzing Edge: {edge_key}")
+            # print(f"\n🔗 Analyzing Edge: {edge_key}")
             
             weight_i = scene.weight_i[edge_key].detach().cpu().numpy()
             conf_i = scene.conf_i[edge_key].detach().cpu().numpy()
@@ -394,21 +394,22 @@ def visualize_optimization_analysis(scene, out_dir, warmup_iters=None):
                         fontsize=16, fontweight='bold', y=0.995)
             
             plt.savefig(out_dir / f'confidence_weight_analysis_edge_{idx}.png', dpi=150, bbox_inches='tight')
-            print(f"✅ Saved: {out_dir / f'confidence_weight_analysis_edge_{idx}.png'}")
+            # print(f"✅ Saved: {out_dir / f'confidence_weight_analysis_edge_{idx}.png'}")
             
             # Print edge statistics
-            print(f"   Confidence: mean={np.mean(conf_i):.4f}, std={np.std(conf_i):.4f}")
-            print(f"   Weight: mean={np.mean(weight_i):.4f}, std={np.std(weight_i):.4f}")
+            # print(f"   Confidence: mean={np.mean(conf_i):.4f}, std={np.std(conf_i):.4f}")
+            # print(f"   Weight: mean={np.mean(weight_i):.4f}, std={np.std(weight_i):.4f}")
             if hasattr(scene, 'CONF_THRE'):
                 outlier_ratio = (weight_i < scene.CONF_THRE).sum() / weight_i.size
-                print(f"   Outliers rejected: {outlier_ratio*100:.2f}%")
+                # print(f"   Outliers rejected: {outlier_ratio*100:.2f}%")
+                pass
             
             plt.close()
     
-    print("\n" + "="*70)
-    print("✅ Optimization analysis complete!")
-    print(f"📁 All visualizations saved to: {out_dir}")
-    print("="*70)
+    # print("\n" + "="*70)
+    # print("✅ Optimization analysis complete!")
+    # print(f"📁 All visualizations saved to: {out_dir}")
+    # print("="*70)
 
 def main(args):
     args.out_dir.mkdir(exist_ok=True, parents=True)
@@ -423,15 +424,15 @@ def main(args):
     for i in range(1):
         ##### Set image names
         list_img0_name = [
-            'seq/000116.color.jpg',
-            'seq/000117.color.jpg'
+            'seq1/frame_00003.jpg',
+            'seq1/frame_00024.jpg'
         ]
         list_img0_name = list_img0_name[:]
-        img1_name = 'seq/000128.color.jpg'
+        img1_name = 'seq0/frame_00000.jpg'
 
         ##### Load poses and intrinsics
         poses_load = {}
-        with (scene_root / 'poses_abs_gt.txt').open('r') as f:
+        with (scene_root / 'poses.txt').open('r') as f:
             for line in f.readlines():
                 if '#' in line: continue
                 line = line.strip().split(' ')
@@ -459,8 +460,6 @@ def main(args):
 
         list_img0_intr = [{'K': torch.from_numpy(intr_load[name]['K']), 'im_size': torch.from_numpy(intr_load[name]['im_size'])} for name in list_img0_name]
         img1_intr = {'K': torch.from_numpy(intr_load[img1_name]['K']), 'im_size': torch.from_numpy(intr_load[img1_name]['im_size'])}
-        # print(f"list_img0_intr: {list_img0_intr}")
-        # print(f"img1_intr: {img1_intr}")
 
         ##### Perform pose estimation
         try:

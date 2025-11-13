@@ -302,6 +302,7 @@ class Dust3rEstimator(BaseEstimator):
                 verbose=self.verbose,
                 dist='l1',
                 conf='log',
+                allow_pw_adaptors=True,
                 calib_params=self.calib_params
             )
 
@@ -344,15 +345,20 @@ class Dust3rEstimator(BaseEstimator):
             if est_opts['known_extrinsics']:
                 if self.two_stage_opt_niter > 0:
                     im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
+                    
                     for pose_param in scene.im_poses:
                         pose_param.requires_grad_(True)
+                    if scene.calib_params is not None:
+                        scene.calib_params.update({'warmup_iters': 0})
+
                     loss = global_alignment_loop(scene, niter=self.two_stage_opt_niter, schedule=self.schedule, lr=self.lr)
-                    im_poses_second = scene.get_im_poses()
-                    for idx in range(len(im_poses_second)):
-                        t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
-                        t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
-                        diff = np.linalg.norm(t2 - t1)
-                        print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
+                    
+                    # im_poses_second = scene.get_im_poses()
+                    # for idx in range(len(im_poses_second)):
+                    #     t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
+                    #     t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
+                    #     diff = np.linalg.norm(t2 - t1)
+                    #     print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
             ###########################
 
             self.scene = scene           
@@ -365,15 +371,3 @@ class Dust3rEstimator(BaseEstimator):
     def save_results(self, log_dir):
         """Saves the results (not implemented)."""
         pass
-
-    # def save_results(self, save_log, scene_root, list_depth_img_name, indice):
-    #     fig0 = self.visualize_weights_errors()
-    #     fig1, avg_depth_error, corr_score = self.visualize_depth_result(scene_root, list_depth_img_name)
-    #     if indice % 5 == 0:
-    #         fig0.savefig(os.path.join(save_log, f"img_weight_error_{indice}.jpg"))
-    #         fig1.savefig(os.path.join(save_log, f"depth_alignment_{indice}.jpg"))
-    #     plt.close(fig0)
-    #     plt.close(fig1)
-
-    #     return avg_depth_error, corr_score
-
