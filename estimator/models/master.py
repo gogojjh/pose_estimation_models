@@ -348,7 +348,8 @@ class Mast3rEstimator(BaseEstimator):
                 dist='l1',
                 conf='log',
                 allow_pw_adaptors=True,
-                calib_params=self.calib_params
+                calib_params=self.calib_params,
+                min_conf_thr=3.0
             )
 
             if est_opts['known_intrinsics']:
