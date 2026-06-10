@@ -8,3 +8,4 @@ assets/*
 build/*
 tmp/
 test/
+docs/plans/
