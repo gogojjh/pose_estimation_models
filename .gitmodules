@@ -1,63 +1,12 @@
-[submodule "estimator/third_party/LightGlue"]
-	path = estimator/third_party/LightGlue
-	url = https://github.com/cvg/LightGlue.git
-[submodule "estimator/third_party/RoMa"]
-	path = estimator/third_party/RoMa
-	url = https://github.com/Parskatt/RoMa
-[submodule "estimator/third_party/DeDoDe"]
-	path = estimator/third_party/DeDoDe
-	url = https://github.com/Parskatt/DeDoDe
-[submodule "estimator/third_party/imatch-toolbox"]
-	path = estimator/third_party/imatch-toolbox
-	url = https://github.com/ga1i13o/image-matching-toolbox
 [submodule "estimator/third_party/duster"]
 	path = estimator/third_party/duster
 	url = https://github.com/gogojjh/dust3r
-[submodule "estimator/third_party/Steerers"]
-	path = estimator/third_party/Steerers
-	url = https://github.com/georg-bn/rotation-steerers.git
-[submodule "estimator/third_party/accelerated_features"]
-	path = estimator/third_party/accelerated_features
-	url = https://github.com/verlab/accelerated_features.git
-[submodule "estimator/third_party/omniglue"]
-	path = estimator/third_party/omniglue
-	url = https://github.com/google-research/omniglue.git
-[submodule "estimator/third_party/gim"]
-	path = estimator/third_party/gim
-	url = https://github.com/alexstoken/gim.git
-[submodule "estimator/third_party/EfficientLoFTR"]
-	path = estimator/third_party/EfficientLoFTR
-	url = https://github.com/zju3dv/EfficientLoFTR
-[submodule "estimator/third_party/Se2_LoFTR"]
-	path = estimator/third_party/Se2_LoFTR
-	url = https://github.com/alexstoken/se2-loftr.git
-[submodule "estimator/third_party/aspanformer"]
-	path = estimator/third_party/aspanformer
-	url = https://github.com/alexstoken/ml-aspanformer.git
-[submodule "estimator/third_party/MatchFormer"]
-	path = estimator/third_party/MatchFormer
-	url = https://github.com/jamycheung/MatchFormer.git
 [submodule "estimator/third_party/mast3r"]
 	path = estimator/third_party/mast3r
 	url = https://github.com/gogojjh/mast3r
-[submodule "estimator/third_party/mickey"]
-	path = estimator/third_party/mickey
-	url = https://github.com/nianticlabs/mickey
-[submodule "estimator/third_party/keypt2subpx"]
-	path = estimator/third_party/keypt2subpx
-	url = https://github.com/KimSinjeong/keypt2subpx.git
-[submodule "estimator/third_party/pixel-perfect-sfm"]
-	path = estimator/third_party/pixel-perfect-sfm
-	url = https://github.com/cvg/pixel-perfect-sfm.git
 [submodule "estimator/third_party/Hierarchical-Localization"]
 	path = estimator/third_party/Hierarchical-Localization
 	url = https://github.com/cvg/Hierarchical-Localization.git
-[submodule "estimator/third_party/CF-3DGS"]
-	path = estimator/third_party/CF-3DGS
-	url = https://github.com/NVlabs/CF-3DGS.git
-[submodule "estimator/third_party/NoPoSplat"]
-	path = estimator/third_party/NoPoSplat
-	url = https://github.com/cvg/NoPoSplat.git
 [submodule "estimator/third_party/reloc3r"]
 	path = estimator/third_party/reloc3r
 	url = https://github.com/ffrivera0/reloc3r
