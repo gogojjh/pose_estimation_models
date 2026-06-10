@@ -12,7 +12,7 @@
 	url = https://github.com/ga1i13o/image-matching-toolbox
 [submodule "estimator/third_party/duster"]
 	path = estimator/third_party/duster
-	url = https://github.com/naver/dust3r
+	url = https://github.com/gogojjh/dust3r
 [submodule "estimator/third_party/Steerers"]
 	path = estimator/third_party/Steerers
 	url = https://github.com/georg-bn/rotation-steerers.git
@@ -39,7 +39,7 @@
 	url = https://github.com/jamycheung/MatchFormer.git
 [submodule "estimator/third_party/mast3r"]
 	path = estimator/third_party/mast3r
-	url = https://github.com/naver/mast3r.git
+	url = https://github.com/gogojjh/mast3r
 [submodule "estimator/third_party/mickey"]
 	path = estimator/third_party/mickey
 	url = https://github.com/nianticlabs/mickey
