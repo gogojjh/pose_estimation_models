@@ -7,7 +7,7 @@ A unified Python API for pose estimation and image localization, wrapping five s
 | DUSt3R (`duster`) | Dense 3D reconstruction + pose | [CVPR 2024](https://arxiv.org/abs/2312.14132) |
 | MASt3R (`master`) | Dense matching + metric pose | [ArXiv 2024](https://arxiv.org/abs/2406.09756) |
 | HLoc (`hloc_*`) | Sparse feature-based localization | [CVPR 2020](https://arxiv.org/abs/1812.03506) |
-| Reloc3r (`reloc3r`) | Relative pose from dense features | [ArXiv 2024](https://arxiv.org/abs/2412.08376) |
+| Reloc3r (`reloc3r`) | Relative pose from dense features | [CVPR 2025](https://arxiv.org/abs/2412.08376) |
 | VPR (`vpr_*`) | Global place recognition | multiple |
 
 ## Install
