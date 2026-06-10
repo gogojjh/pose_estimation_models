@@ -1,32 +1,102 @@
-Thanks for your interest in contributing to IMM!
+# Contributing: Adding a New Pose Estimation Model
 
-To add a new method:
-1. Create a new file in the `matching/im_models` folder called `[method].py`
-2. If the method requires external modules, add them to `./matching/third_party` with `git submodule add`: for example, I've used this command to add the LightGlue module which is automatically downloaded when using `--recursive`
+This guide explains how to add a new estimator to `pose_estimation_models`.
+
+## Structure
+
+```
+estimator/
+├── __init__.py              # available_models list + get_estimator() factory
+├── models/
+│   ├── base_estimator.py    # BaseEstimator base class — read this first
+│   ├── duster.py            # DUSt3R example
+│   ├── master.py            # MASt3R example
+│   ├── hloc.py              # HLoc example
+│   ├── reloc3r.py           # Reloc3r example
+│   └── vpr.py               # VPR example
+├── third_party/             # git submodules for external model code
+│   ├── duster/              # gogojjh/dust3r (branch: lora_finetune)
+│   ├── mast3r/              # gogojjh/mast3r (branch: main)
+│   ├── Hierarchical-Localization/
+│   └── reloc3r/
+└── utils.py                 # add_to_path, resize_to_divisible, etc.
+```
+
+## Steps to Add a New Model
+
+### 1. Add a git submodule (if the model has external dependencies)
 
 ```bash
-git submodule add https://github.com/cvg/LightGlue matching/third_party/LightGlue
-```
-This command automatically modifies `.gitmodules` (and modifying it manually doesn't work).
-
-3. Add the method by subclassing `BaseMatcher` and implementing `_forward`, which takes two image tensors as input and returns a dict with keys `['num_inliers','H', 'mkpts0', 'mkpts1', 'inliers0', 'inliers1', 'kpts0', 'kpts1', 'desc0', desc1']`. The value of any key may be 0, if that model does not produce that output, but they key must exist. See `TEMPLATE.py` for an example.
-<br></br>You may also want to implement `preprocess`, `download_weights`, and anything else necessary to make the model easy to run. 
-
-4. Open `__init__.py` and add the model name (all lowercase) to the `available_models` list.
-<br></br>Add an `elif` case to `get_matcher()` with this model name, following the template from the other matchers. 
-
-5. If it requires additional dependencies, add them to `requirements.txt` or to the `[project.optional-dependencies]` of `pyproject.toml`.
-
-6. Format the code with [Black](https://github.com/psf/black), like this
-```
-pip install black
-cd image-matching-models && black --line-length 120 ./
+git submodule add <repo_url> estimator/third_party/<model_name>
+git submodule update --init --recursive estimator/third_party/<model_name>
 ```
 
-7. Test your model and submit a PR!
+### 2. Create the estimator class
 
-Note: as authors update their model repos, consider updating the submodule reference here using the below:
-To update a submodule to the head of the remote, run 
+Create `estimator/models/<model_name>.py`. Use [TEMPLATE.py](../TEMPLATE.py) as a starting point.
+
+Your class must:
+- Inherit from `BaseEstimator` (`from estimator import BaseEstimator`)
+- Add the external repo to `sys.path` via `add_to_path`:
+
+```python
+from estimator.utils import add_to_path
+from estimator import THIRD_PARTY_DIR, WEIGHTS_DIR
+
+add_to_path(THIRD_PARTY_DIR / "<model_name>")
+```
+
+- Implement `_forward(self, img0, img1)` returning `(focal, im_pose, loss)`
+- Implement `download_weights(self)` to fetch model weights to `WEIGHTS_DIR`
+
+### 3. Register in `estimator/__init__.py`
+
+Add to `available_models`:
+
+```python
+available_models = [
+    ...
+    "your_model_name",
+]
+```
+
+Add a branch in `get_estimator()`:
+
+```python
+elif "your_model" in estimator_name:
+    from estimator.models.your_model import YourEstimator
+    return YourEstimator(device=device, **kwargs)
+```
+
+### 4. Update `requirements.txt`
+
+Add any new pip dependencies (one per line with a comment):
+
+```
+# your_model
+your-dependency>=1.0
+```
+
+### 5. Code style
+
+Format with Black (`--line-length 120`):
+
 ```bash
-git submodule update --remote matching/third_party/[submodule_name]
+black --line-length 120 estimator/models/<model_name>.py
+```
+
+### 6. Test manually
+
+```python
+from estimator import get_estimator
+est = get_estimator("your_model_name", device="cpu")
+# load two test images and run forward
+```
+
+### 7. Commit and open a PR
+
+```bash
+git add estimator/models/<model_name>.py estimator/__init__.py .gitmodules requirements.txt
+git commit -m "feat(estimator): add <ModelName> estimator"
+git push origin <your-branch>
 ```
