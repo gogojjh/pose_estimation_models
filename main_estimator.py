@@ -124,8 +124,8 @@ def main(args):
 
     # ---- 3. Run estimation ----
     list_img0_name = [
-        'seq1/frame_00003.jpg',
-        'seq1/frame_00024.jpg',
+        'seq1/frame_00000.jpg',
+        'seq1/frame_00001.jpg',
     ]
     list_img0_name = list_img0_name[:]
     img1_name = 'seq0/frame_00000.jpg'
@@ -159,14 +159,17 @@ def main(args):
 
     # ---- 4. Show edge confidence ----
     msp_edges = estimator.get_minimum_spanning_tree()
-    weight_i, weight_j = estimator.scene.weight_i, estimator.scene.weight_j
+    conf_i, conf_j = estimator.scene.conf_i, estimator.scene.conf_j
     for edge in msp_edges:
         if edge[0] == 2 or edge[1] == 2:
             edge_str = f"{edge[0]}_{edge[1]}"
-            conf = (weight_i[edge_str].mean() * weight_j[edge_str].mean()).detach().cpu().item()
+            conf = (conf_i[edge_str].mean() * conf_j[edge_str].mean()).detach().cpu().item()
             print(f"Conf of {edge_str}: {conf:.3f}")
 
-    estimator.show_reconstruction()
+    try:
+        estimator.show_reconstruction()
+    except Exception as e:
+        print(f"Unable to show reconstruction: {e}")
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -182,7 +185,6 @@ def parse_args():
     )
 
     # Hyperparameters shared by all methods:
-    # parser.add_argument("--im_size", type=int, default=512, help="resize img to im_size x im_size")
     parser.add_argument("--device", type=str, default="cuda", choices=["cpu", "cuda"])
     parser.add_argument("--no_viz", action="store_true", help="avoid saving visualizations")
     parser.add_argument("--max_num_keypoint", type=int, default=2048, help="maximum number of keypoints")
