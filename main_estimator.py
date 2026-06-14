@@ -102,8 +102,8 @@ def main(args):
         'known_intrinsics': False,
         'niter': 300,
         'two_stage_opt_niter': 50,
-        'crop_image_to_database': True,
-        'resize': (512, 288),
+        'crop_image_to_database': False,
+        'resize': (288, 512),
     }
 
     args.out_dir.mkdir(exist_ok=True, parents=True)
