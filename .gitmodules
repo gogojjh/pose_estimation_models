@@ -1,6 +1,7 @@
 [submodule "estimator/third_party/duster"]
 	path = estimator/third_party/duster
 	url = https://github.com/gogojjh/dust3r
+	branch = lora_finetune
 [submodule "estimator/third_party/mast3r"]
 	path = estimator/third_party/mast3r
 	url = https://github.com/gogojjh/mast3r
