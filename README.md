@@ -24,6 +24,22 @@ Required submodules (initialized by `--recursive`):
 - `estimator/third_party/Hierarchical-Localization` — HLoc pipeline
 - `estimator/third_party/reloc3r` — Reloc3r model
 
+## Test Data
+
+`main_estimator.py` expects a scene directory in the Map-free layout (`poses.txt`, `intrinsics.txt`, `seq/`). Two ready-to-use sources:
+- **Map-free dataset** (real-world scenes): download from [nianticspatial.com/research/map-free/dataset](https://nianticspatial.com/research/map-free/dataset).
+- **Simulated Matterport3D + others**: download from [this Google Drive folder](https://drive.google.com/drive/folders/1j1QxQeJOfk4pLWeKFLm6WBWD7zb9Y0Rn?usp=sharing).
+
+After downloading and extracting a scene (e.g. `<scene_root>/{poses.txt,intrinsics.txt,seq/}`), run:
+
+```bash
+python main_estimator.py --model master --scene_root <scene_root> --device cuda --out_dir outputs_master
+```
+
+- `--model` — any entry from `available_models` (see below), e.g. `duster`, `master`, `reloc3r`.
+- `--scene_root` — path to the downloaded scene directory.
+- `--out_dir` — where visualizations/results are written (defaults to `outputs_<model>`).
+
 ## Available Models
 
 ```python
