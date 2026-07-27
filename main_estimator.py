@@ -167,7 +167,7 @@ def main(args):
             print(f"Conf of {edge_str}: {conf:.3f}")
 
     try:
-        estimator.show_reconstruction()
+        estimator.show_reconstruction(cam_size=0.3)
     except Exception as e:
         print(f"Unable to show reconstruction: {e}")
 

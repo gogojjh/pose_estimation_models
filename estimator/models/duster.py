@@ -70,48 +70,6 @@ class Dust3rEstimator(BaseEstimator):
     def set_calib_params(self, new_calib_params):
         self.calib_params = new_calib_params
 
-    ##### NOTE(gogojjh): Not used for now
-    # # Loading another lora params on-the-fly
-    # def _safely_integrate_lora(self, lora_path: str, target_device: str):
-    #     """Safely integrates LoRA weights with CPU-based processing to prevent CUDA errors.
-
-    #     Args:
-    #         lora_path: Path to LoRA weights file
-    #         target_device: Original device for the model (preserves device context)
-    #     """
-    #     # Store original device and force CPU context
-    #     # original_device = next(self.model.parameters()).device
-    #     self.model = self.model.to('cpu')
-
-    #     # Phase 1: Inject LoRA adapters
-    #     for name, module in self.model.named_modules():
-    #         if any(n in name.split('.') for n in ['qkv']) and isinstance(module, torch.nn.Linear):
-    #             inject_lora(self.model, name, module)
-
-    #     # Phase 2: Load LoRA weights
-    #     try:
-    #         lora_weights = torch.load(lora_path, map_location='cpu')
-    #         self.model.load_state_dict(lora_weights, strict=False)
-    #         print(f'LoRA Parameters: {sum(v.numel() for v in lora_weights.values()):,}')
-    #     except Exception as e:
-    #         raise RuntimeError(f"LoRA integration failed: {str(e)}")
-
-    #     # Phase 3: Merge LoRA weights into base model
-    #     for name, module in self.model.named_modules():
-    #         if isinstance(module, LoraLayer):
-    #             parent = self.model
-    #             # Traverse module hierarchy: a.b.c → getattr(a, 'b')
-    #             for component in name.split('.')[:-1]:
-    #                 parent = getattr(parent, component)
-
-    #             # Mathematical merge: W' = W + (A*B)*(α/r)
-    #             lora_weight = ((module.lora_a @ module.lora_b) * module.alpha / module.r).T
-    #             merged_weight = module.raw_linear.weight + lora_weight
-    #             module.raw_linear.weight.data.copy_(merged_weight)
-
-    #             # Replace composite layer with merged linear layer
-    #             setattr(parent, name.split('.')[-1], module.raw_linear)
-
     @staticmethod
     def download_weights():
         url = ("https://download.europe.naverlabs.com/ComputerVision/DUSt3R/"
@@ -343,22 +301,13 @@ class Dust3rEstimator(BaseEstimator):
             ###########################
             # Perform two-stage optimization to adjust the noisy poses
             if est_opts['known_extrinsics']:
-                if self.two_stage_opt_niter > 0:
-                    im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
-                    
+                if self.two_stage_opt_niter > 0:                    
                     for pose_param in scene.im_poses:
                         pose_param.requires_grad_(True)
                     if scene.calib_params is not None:
                         scene.calib_params.update({'warmup_iters': 0})
 
                     loss = global_alignment_loop(scene, niter=self.two_stage_opt_niter, schedule=self.schedule, lr=self.lr)
-                    
-                    # im_poses_second = scene.get_im_poses()
-                    # for idx in range(len(im_poses_second)):
-                    #     t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
-                    #     t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
-                    #     diff = np.linalg.norm(t2 - t1)
-                    #     print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
             ###########################
 
             self.scene = scene           
