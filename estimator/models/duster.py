@@ -236,7 +236,7 @@ class Dust3rEstimator(BaseEstimator):
         #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view'])
         
         num_img_input = len(images)
-        output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
+        output = inference(pairs, self.model, self.device, batch_size=len(pairs), verbose=self.verbose)
         self.output_inference = output
 
         # GlobalAlignerMode.PairViewer

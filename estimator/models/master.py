@@ -69,48 +69,6 @@ class Mast3rEstimator(BaseEstimator):
         """
         self.calib_params = new_calib_params
 
-    ##### NOTE(gogojjh): Not used for now
-    # # Loading another lora params on-the-fly
-    # def _safely_integrate_lora(self, lora_path: str, target_device: str):
-    #     """Safely integrates LoRA weights with CPU-based processing to prevent CUDA errors.
-
-    #     Args:
-    #         lora_path (str): Path to LoRA weights file.
-    #         target_device (str): Original device for the model (preserves device context).
-    #     """
-    #     # Store original device and force CPU context
-    #     # original_device = next(self.model.parameters()).device
-    #     self.model = self.model.to('cpu')
-
-    #     # Phase 1: Inject LoRA adapters
-    #     for name, module in self.model.named_modules():
-    #         if any(n in name.split('.') for n in ['qkv']) and isinstance(module, torch.nn.Linear):
-    #             inject_lora(self.model, name, module)
-
-    #     # Phase 2: Load LoRA weights
-    #     try:
-    #         lora_weights = torch.load(lora_path, map_location='cpu')
-    #         self.model.load_state_dict(lora_weights, strict=False)
-    #         print(f'LoRA Parameters: {sum(v.numel() for v in lora_weights.values()):,}')
-    #     except Exception as e:
-    #         raise RuntimeError(f"LoRA integration failed: {str(e)}")
-
-    #     # Phase 3: Merge LoRA weights into base model
-    #     for name, module in self.model.named_modules():
-    #         if isinstance(module, LoraLayer):
-    #             parent = self.model
-    #             # Traverse module hierarchy: a.b.c → getattr(a, 'b')
-    #             for component in name.split('.')[:-1]:
-    #                 parent = getattr(parent, component)
-
-    #             # Mathematical merge: W' = W + (A*B)*(α/r)
-    #             lora_weight = ((module.lora_a @ module.lora_b) * module.alpha / module.r).T
-    #             merged_weight = module.raw_linear.weight + lora_weight
-    #             module.raw_linear.weight.data.copy_(merged_weight)
-
-    #             # Replace composite layer with merged linear layer
-    #             setattr(parent, name.split('.')[-1], module.raw_linear)
-
     @staticmethod
     def download_weights():
         """Downloads the weights for the MASt3R model."""
@@ -292,38 +250,8 @@ class Mast3rEstimator(BaseEstimator):
 
         pairs = make_pairs(images, scene_graph="complete", prefilter=None, symmetrize=True)
 
-        ##### Start inference
-        # NOTE(gogojjh): At this stage, you have the raw dust3r predictions
-        # here, view1, pred1, view2, pred2 are dicts of lists of len(2)
-        #  -> because we symmetrize we have (im1, im2) and (im2, im1) pairs
-        # in each view you have:
-        # an integer image identifier: view1['idx'] and view2['idx']
-        # the img: view1['img'] and view2['img']
-        # the image shape: view1['true_shape'] and view2['true_shape']
-        # an instance string output by the dataloader: view1['instance'] and view2['instance']
-        # pred1 and pred2 contains the confidence values: pred1['conf'] and pred2['conf']
-        # pred1 contains 3D points for view1['img'] in view1['img'] space: pred1['pts3d']
-        # pred2 contains 3D points for view2['img'] in view1['img'] space: pred2['pts3d_in_other_view']
-        # next we'll use the global_aligner to align the predictions
-        # depending on your task, you may be fine with the raw output and not need it
-        # with only two input images, you could use GlobalAlignerMode.PairViewer: it would just convert the output
-        # if using GlobalAlignerMode.PairViewer, no need to run compute_global_alignment
-        # Summary: Keys of output, view1, pred1, view2, pred2
-        #   output['view1', 'view2', 'pred1', 'pred2', 'loss'])
-        #   view1['img', 'true_shape', 'idx', 'instance']) = output['view1']
-        #   view2['img', 'true_shape', 'idx', 'instance']) = output['view1']
-        #       for idx in output['view1']['idx']:
-        #           print(idx) # output 2 idxs
-        #   pred1['pts3d', 'conf', 'desc', 'desc_conf']) = output['pred1']
-        #   pred2['conf', 'desc', 'desc_conf', 'pts3d_in_other_view']) = output['pred2']
-        #       for pts3d in output['pred1']['pts3d']:
-        #           print(pts3d) # output 2 pts3d
-        # Example: get predict pts from two-view
-        # pts3d = scene.get_pts3d()[n]
-        # confidence_masks = scene.get_masks()[n]
-
         num_img_input = len(images)
-        output = inference(pairs, self.model, self.device, batch_size=1, verbose=self.verbose)
+        output = inference(pairs, self.model, self.device, batch_size=len(pairs), verbose=self.verbose)
         self.output_inference = output
 
         # GlobalAlignerMode.PairViewer
@@ -389,22 +317,13 @@ class Mast3rEstimator(BaseEstimator):
             ###########################
             # Perform two-stage optimization to adjust the noisy poses
             if est_opts['known_extrinsics']:
-                if self.two_stage_opt_niter > 0:
-                    im_poses_first = [im_pose.clone() for im_pose in scene.get_im_poses()]
-                    
+                if self.two_stage_opt_niter > 0:                  
                     for pose_param in scene.im_poses:
                         pose_param.requires_grad_(True)
                     if scene.calib_params is not None:
                         scene.calib_params.update({'warmup_iters': 0})
                     
                     loss = global_alignment_loop(scene, niter=self.two_stage_opt_niter, schedule=self.schedule, lr=self.lr)
-                    
-                    # im_poses_second = scene.get_im_poses()
-                    # for idx in range(len(im_poses_second)):
-                    #     t1 = im_poses_first[idx].detach().cpu().numpy()[:3, 3].T
-                    #     t2 = im_poses_second[idx].detach().cpu().numpy()[:3, 3].T
-                    #     diff = np.linalg.norm(t2 - t1)
-                    #     print(f"{idx}: {t1} -> {t2} (diff: {diff:.3f} m)")
             ###########################
 
             self.scene = scene
