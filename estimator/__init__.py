@@ -23,6 +23,7 @@ available_models = [
     "duster",
     "master",
     "reloc3r",
+    "vggt",
     "duster_{nocalib, calib}_pretrain",
     "master_{nocalib, calib}_pretrain"
 ]
@@ -160,6 +161,17 @@ def get_estimator(estimator_name="master", device="cpu", out_dir='/tmp', *args, 
 
         from estimator.models import reloc3r
         return reloc3r.Reloc3rEstimator(device, *args, **kwargs)
+
+    elif 'vggt' in estimator_name:
+        # Validate estimator name structure
+        is_base_model = estimator_name in ('vggt')
+        if not is_base_model:
+            raise RuntimeError(
+                f"Estimator {estimator_name} not yet supported. Consider submitting a PR to add it. Available models: {available_models}"
+            )
+
+        from estimator.models import vggt
+        return vggt.VggtEstimator(device, *args, **kwargs)
 
     else:
         raise RuntimeError(

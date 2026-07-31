@@ -157,14 +157,15 @@ def main(args):
         print(f"Error: {e}")
         return
 
-    # ---- 4. Show edge confidence ----
-    msp_edges = estimator.get_minimum_spanning_tree()
-    conf_i, conf_j = estimator.scene.conf_i, estimator.scene.conf_j
-    for edge in msp_edges:
-        if edge[0] == 2 or edge[1] == 2:
-            edge_str = f"{edge[0]}_{edge[1]}"
-            conf = (conf_i[edge_str].mean() * conf_j[edge_str].mean()).detach().cpu().item()
-            print(f"Conf of {edge_str}: {conf:.3f}")
+    # ---- 4. Show edge confidence (only for global-alignment estimators, e.g. DUSt3R/MASt3R) ----
+    if hasattr(estimator, "get_minimum_spanning_tree"):
+        msp_edges = estimator.get_minimum_spanning_tree()
+        conf_i, conf_j = estimator.scene.conf_i, estimator.scene.conf_j
+        for edge in msp_edges:
+            if edge[0] == 2 or edge[1] == 2:
+                edge_str = f"{edge[0]}_{edge[1]}"
+                conf = (conf_i[edge_str].mean() * conf_j[edge_str].mean()).detach().cpu().item()
+                print(f"Conf of {edge_str}: {conf:.3f}")
 
     try:
         estimator.show_reconstruction(cam_size=0.3)
