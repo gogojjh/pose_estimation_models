@@ -111,15 +111,11 @@ class VggtEstimator(BaseEstimator):
     ) -> Tuple[float, np.ndarray, np.ndarray]:
         """Similarity transform (scale, R, t) mapping VGGT's world frame to the known one.
 
-        A single reference frame cannot constrain scale, so a rigid transform anchored on
-        that frame is returned instead.
+        align_poses solves rotation from the reference orientations, so N=2 is fully
+        constrained; with a single reference it degrades to a rigid transform (scale=1).
         """
-        if len(vggt_c2w_ref) >= 2:
-            _, (scale, rotation, translation) = align_poses(vggt_c2w_ref, known_c2w_ref)
-            return float(scale), rotation, translation
-
-        transform = known_c2w_ref[0] @ np.linalg.inv(vggt_c2w_ref[0])
-        return 1.0, transform[:3, :3], transform[:3, 3]
+        _, (scale, rotation, translation) = align_poses(vggt_c2w_ref, known_c2w_ref)
+        return float(scale), rotation, translation
 
     @staticmethod
     def _align_pose(align: Tuple[float, np.ndarray, np.ndarray], c2w: np.ndarray) -> np.ndarray:
