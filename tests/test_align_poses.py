@@ -117,3 +117,22 @@ def test_negative_scale_fit_falls_back_to_unit_scale():
 
     assert scale == 1.0
     assert np.isfinite(rotation).all() and np.isfinite(translation).all()
+
+
+def test_many_reference_recovery_stays_exact_in_the_well_conditioned_regime():
+    # Regression test for well-conditioned N>=3 with non-collinear camera centers.
+    # This covers the typical hloc.py:180 use case where many reference poses are
+    # available. The rotation-constrained approach must preserve exact recovery of
+    # the known similarity transform in this regime.
+    rng = np.random.default_rng(20)
+    vggt_refs = [_rand_pose(rng) for _ in range(5)]
+    truth = (1.8, _rand_pose(rng)[:3, :3], np.array([-0.5, 2.0, 1.2]))
+    known_refs = [_apply(truth, pose) for pose in vggt_refs]
+
+    aligned, (scale, rotation, translation) = align_poses(vggt_refs, known_refs)
+
+    np.testing.assert_allclose(scale, 1.8, atol=1e-10)
+    np.testing.assert_allclose(rotation, truth[1], atol=1e-10)
+    np.testing.assert_allclose(translation, truth[2], atol=1e-10)
+    for aligned_pose, known_pose in zip(aligned, known_refs):
+        np.testing.assert_allclose(aligned_pose, known_pose, atol=1e-10)
