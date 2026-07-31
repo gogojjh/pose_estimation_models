@@ -6,7 +6,7 @@ import torch
 import torchvision.transforms as tfm
 import os, contextlib
 from yacs.config import CfgNode as CN
-from typing import Union
+from typing import List, Tuple, Union
 
 from scipy.spatial.transform import Rotation
 from scipy.optimize import minimize
@@ -16,64 +16,53 @@ from sklearn.decomposition import PCA
 logger = logging.getLogger()
 logger.setLevel(31)  # Avoid printing useless low-level logs
 
-def align_poses(estimated_poses, gt_poses):
+def align_poses(
+    estimated_poses: List[np.ndarray], gt_poses: List[np.ndarray]
+) -> Tuple[List[np.ndarray], Tuple[float, np.ndarray, np.ndarray]]:
     """
-    Align estimated poses to ground truth using similarity transformation.
-    
+    Align estimated poses to ground truth with a similarity transform (s, R, t).
+
+    The rotation is solved first by chordal-L2 averaging of the per-pose
+    relative rotations, which stays fully constrained even when the camera
+    centers are collinear (e.g. N=2), where a translation-only Umeyama fit
+    leaves one rotational DOF free. With R fixed, scale and translation follow
+    from a linear least-squares fit of the centers. Falls back to scale=1.0
+    when the centers cannot constrain scale (N=1, coincident centers) or when
+    the fit returns a non-positive scale.
+
     Args:
-        estimated_poses: List of 4x4 transformation matrices [T0, T1, T2]
-        gt_poses: List of 4x4 transformation matrices [G0, G1, G2]
-    
+        estimated_poses: List of 4x4 camera-to-world matrices.
+        gt_poses: List of 4x4 camera-to-world matrices, same length and order.
+
     Returns:
-        List of aligned 4x4 transformation matrices
+        (aligned_poses, (scale, R, translation)): transformed estimated poses
+        and the recovered similarity parameters.
     """
-    # Extract corresponding translations (T0-T2 and G0-G2)
-    src_pts = [T[:3, 3] for T in estimated_poses]
-    tgt_pts = [G[:3, 3] for G in gt_poses]
+    chordal_sum = np.zeros((3, 3))
+    for T, G in zip(estimated_poses, gt_poses):
+        chordal_sum += G[:3, :3] @ T[:3, :3].T
+    U, _, Vt = np.linalg.svd(chordal_sum)
+    # det factor projects onto SO(3), guarding against reflections.
+    R = U @ np.diag([1.0, 1.0, np.linalg.det(U @ Vt)]) @ Vt
 
-    # Compute centroids
-    mu_src = np.mean(src_pts, axis=0)
-    mu_tgt = np.mean(tgt_pts, axis=0)
-
-    # Center points
-    src_centered = src_pts - mu_src
-    tgt_centered = tgt_pts - mu_tgt
-
-    # Compute covariance matrix H
-    H = np.dot(src_centered.T, tgt_centered)
-
-    # Singular Value Decomposition
-    U, S, Vt = np.linalg.svd(H)
-    R = Vt.T @ U.T
-
-    # Handle reflection case
-    if np.linalg.det(R) < 0:
-        Vt[-1, :] *= -1
-        R = Vt.T @ U.T
-
-    # Compute scale
-    src_var = np.sum([np.linalg.norm(p)**2 for p in src_centered])
-    scale = np.trace(np.diag(S)) / src_var
-
-    # Compute translation
+    # With R fixed, c_gt = s * R c_est + t is linear in (s, t).
+    src = np.array([T[:3, 3] for T in estimated_poses])
+    tgt = np.array([G[:3, 3] for G in gt_poses])
+    mu_src, mu_tgt = src.mean(axis=0), tgt.mean(axis=0)
+    src_rot = (src - mu_src) @ R.T
+    tgt_centered = tgt - mu_tgt
+    denom = float((src_rot ** 2).sum())
+    scale = float((src_rot * tgt_centered).sum() / denom) if denom > 1e-12 else 1.0
+    if scale <= 0:  # grossly inconsistent geometry: the fitted scale is not trustworthy
+        scale = 1.0
     translation = mu_tgt - scale * (R @ mu_src)
 
-    # Apply transformation to all estimated poses
     aligned_poses = []
     for T in estimated_poses:
-        R_est = T[:3, :3]
-        t_est = T[:3, 3]
-        
-        # Align rotation and translation
-        R_aligned = R @ R_est
-        t_aligned = scale * (R @ t_est) + translation
-        
-        # Create aligned transformation matrix
-        aligned_T = np.eye(4)
-        aligned_T[:3, :3] = R_aligned
-        aligned_T[:3, 3] = t_aligned
-        aligned_poses.append(aligned_T)
-
+        aligned = np.eye(4)
+        aligned[:3, :3] = R @ T[:3, :3]
+        aligned[:3, 3] = scale * (R @ T[:3, 3]) + translation
+        aligned_poses.append(aligned)
     return aligned_poses, (scale, R, translation)
 def convert_vec_to_matrix(vec_p, vec_q, mode='xyzw'):
 	# Initialize a 4x4 identity matrix
