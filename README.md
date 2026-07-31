@@ -1,11 +1,12 @@
 # pose_estimation_models
 
-A unified Python API for pose estimation and image localization, wrapping five state-of-the-art model types:
+A unified Python API for pose estimation and image localization, wrapping six state-of-the-art model types:
 
 | Model | Type | Paper |
 |-------|------|-------|
 | DUSt3R (`duster`) | Dense 3D reconstruction + pose | [CVPR 2024](https://arxiv.org/abs/2312.14132) |
 | MASt3R (`master`) | Dense matching + metric pose | [ECCV 2024](https://arxiv.org/abs/2406.09756) |
+| VGGT (`vggt`) | Feed-forward multi-view geometry | [CVPR 2025](https://arxiv.org/abs/2503.11651) |
 | HLoc (`hloc_*`) | Sparse feature-based localization | [CVPR 2020](https://arxiv.org/abs/1812.03506) |
 | Reloc3r (`reloc3r`) | Relative pose from dense features | [CVPR 2025](https://arxiv.org/abs/2412.08376) |
 | VPR (`vpr_*`) | Global place recognition | multiple |
@@ -21,8 +22,12 @@ pip install .
 Required submodules (initialized by `--recursive`):
 - `estimator/third_party/duster` — DUSt3R backbone (gogojjh fork)
 - `estimator/third_party/mast3r` — MASt3R backbone (gogojjh fork)
+- `estimator/third_party/vggt` — VGGT backbone (facebookresearch)
 - `estimator/third_party/Hierarchical-Localization` — HLoc pipeline
 - `estimator/third_party/reloc3r` — Reloc3r model
+
+VGGT weights (`facebook/VGGT-1B`, ~1.3 B parameters) are pulled from the HuggingFace Hub on first use
+and cached under `WEIGHTS_DIR` — no manual download step.
 
 ## Test Data
 
@@ -48,10 +53,46 @@ print(available_models)
 # [
 #   "hloc_disk_dilg", "hloc_superpoint_splg",
 #   "vpr_cosplace_resnet18_256", "vpr_netvlad_resnet18_4096",
-#   "duster", "master", "reloc3r",
+#   "duster", "master", "reloc3r", "vggt",
 #   "duster_{nocalib,calib}_pretrain", "master_{nocalib,calib}_pretrain"
 # ]
 ```
+
+## VGGT
+
+VGGT differs from the other pose estimators in how it consumes input and what it returns.
+
+**Single forward pass, no global alignment.** DUSt3R/MASt3R run pairwise inference followed by an
+iterative global-alignment optimization. VGGT predicts every camera pose, depth map, and point map for
+all input views in one feed-forward pass, which makes it roughly an order of magnitude faster.
+
+**All reference images at once.** The estimator takes the full reference list plus the query image in a
+single call, rather than one reference/query pair at a time.
+
+**Predicted poses live in an arbitrary-scale frame** anchored at the first input image, so they are not
+directly comparable to the scene's absolute poses. To recover an absolute query pose, the predicted
+reference poses are aligned to their known absolute poses with a rotation-constrained similarity
+transform, and that same transform is applied to the query prediction. VGGT also predicts its own
+intrinsics, so the `*_intr` arguments are ignored.
+
+```bash
+python main_estimator.py --model vggt --scene_root <scene_root> --device cuda --out_dir outputs_vggt
+```
+
+`show_reconstruction(conf_thres=50.0)` opens an interactive viewer with the aligned point cloud and
+camera frustums — references in blue, query in red. `conf_thres` drops that percentage of the
+lowest-confidence points (global percentile across all views).
+
+> **Viewer troubleshooting.** The viewer needs a working GL context. If it fails with
+> `MESA-LOADER: failed to open iris/swrast` or `Could not create GL context`, a shell-level
+> `LD_PRELOAD` of the system libGL is likely colliding with conda's, and the system Mesa may be too
+> old for recent Intel iGPUs. Run with the preload masked for that process only:
+> ```bash
+> env -u LD_PRELOAD LIBGL_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri LIBGL_ALWAYS_SOFTWARE=1 \
+>     python main_estimator.py --model vggt --scene_root <scene_root>
+> ```
+> The viewer additionally requires `pyglet<2` — trimesh's windowed viewer never adopted the pyglet 2.x
+> API. Inference and pose estimation are unaffected by any of this.
 
 ## Usage
 
