@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from pathlib import Path
-from typing import Union, List, Dict, Tuple
+from typing import Union, List, Dict, Tuple, Optional
 
 from estimator import BaseEstimator, WEIGHTS_DIR, THIRD_PARTY_DIR
 from estimator.utils import add_to_path, align_poses, to_numpy
@@ -36,6 +36,7 @@ class VggtEstimator(BaseEstimator):
         """
         super().__init__(device, **kwargs)
         self.verbose = False
+        self._recon_state: Dict = {}
 
         self.model = self.download_weights()
         print(f'Model Parameters: {sum(p.numel() for p in self.model.parameters()):,}')
@@ -51,9 +52,49 @@ class VggtEstimator(BaseEstimator):
         """Loads the VGGT-1B weights, cached under WEIGHTS_DIR via the HuggingFace Hub."""
         return VGGT.from_pretrained(self.model_name, cache_dir=WEIGHTS_DIR)
 
-    def show_reconstruction(self, cam_size=None):
-        """Shows the reconstruction (not implemented)."""
-        pass
+    def show_reconstruction(self, cam_size: Optional[float] = None, conf_thres: float = 50.0):
+        """Shows the point cloud and camera poses in an interactive trimesh window.
+
+        Reuses dust3r's SceneViz so the viewer matches Dust3rEstimator/Mast3rEstimator.
+        Points and cameras share the alignment computed in `_forward`, so what is drawn
+        lives in the same world frame as the returned pose estimate.
+
+        Args:
+            cam_size: camera marker size; derived from the pose spread when None.
+            conf_thres: percentage of lowest-confidence points to drop.
+
+        Returns:
+            The SceneViz, or None if the estimator has not been run yet.
+        """
+        if not self._recon_state:
+            print("No reconstruction to show: run the estimator first.")
+            return None
+
+        add_to_path(THIRD_PARTY_DIR.joinpath("duster"))
+        from dust3r.viz import SceneViz, auto_cam_size
+
+        state = self._recon_state
+        align, num_ref = state["align"], state["num_ref"]
+
+        imgs = [np.transpose(img, (1, 2, 0)) for img in state["images"]]
+        pts3d = [self._align_points(align, pts) for pts in state["world_points"]]
+        masks = self._confidence_masks(state["world_points_conf"], conf_thres)
+        poses = [self._align_pose(align, c2w) for c2w in state["vggt_c2w"]]
+        # Query frame in red so the localization target stands out from the references.
+        colors = [(0, 128, 255)] * num_ref + [(255, 0, 0)]
+
+        viz = SceneViz()
+        viz.add_pointcloud(pts3d, imgs, masks)
+        viz.add_cameras(
+            poses,
+            state["focals"],
+            images=imgs,
+            colors=colors,
+            cam_size=auto_cam_size(np.stack(poses)) if cam_size is None else cam_size,
+        )
+        viz.show()
+
+        return viz
 
     @staticmethod
     def _w2c_to_c2w(Rt: np.ndarray) -> np.ndarray:
@@ -162,6 +203,17 @@ class VggtEstimator(BaseEstimator):
         est_focal = intrinsic[num_ref, 0, 0].detach()
         loss = 0.0
         self.scene = None
+        self._recon_state = {
+            "images": to_numpy(images),                                     # (S, 3, H, W) in [0, 1]
+            # .float() mirrors the pose_enc handling above: heads run under autocast, and
+            # numpy() rejects bfloat16 outright.
+            "world_points": to_numpy(predictions["world_points"][0].float()),       # (S, H, W, 3)
+            "world_points_conf": to_numpy(predictions["world_points_conf"][0].float()),  # (S, H, W)
+            "focals": [float(intrinsic[i, 0, 0]) for i in range(intrinsic.shape[0])],
+            "vggt_c2w": vggt_c2w,
+            "align": align,
+            "num_ref": num_ref,
+        }
 
         return est_focal, est_im_pose, loss
 
