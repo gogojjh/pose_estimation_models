@@ -95,6 +95,22 @@ class VggtEstimator(BaseEstimator):
         scale, rotation, translation = align
         return scale * (pts @ rotation.T) + translation
 
+    @staticmethod
+    def _confidence_masks(conf: np.ndarray, conf_thres: float) -> List[np.ndarray]:
+        """Per-frame boolean masks keeping only the most confident points.
+
+        Args:
+            conf: per-pixel confidence of shape (S, H, W).
+            conf_thres: percentage of lowest-confidence points to drop, in [0, 100).
+
+        Returns:
+            One (H, W) boolean mask per frame. The threshold is computed over all frames
+            at once so every frame keeps points on the same confidence scale.
+        """
+        threshold = np.percentile(conf, conf_thres) if conf_thres > 0 else 0.0
+        keep = (conf >= threshold) & (conf > 1e-5)
+        return [keep[i] for i in range(keep.shape[0])]
+
     def _forward(
         self,
         scene_root: Path,

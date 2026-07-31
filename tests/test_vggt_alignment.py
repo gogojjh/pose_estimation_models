@@ -56,3 +56,34 @@ def test_align_points_preserves_leading_dimensions():
     align = (0.5, _rand_pose(rng)[:3, :3], np.zeros(3))
 
     assert VggtEstimator._align_points(align, rng.standard_normal((4, 5, 3))).shape == (4, 5, 3)
+
+
+def test_confidence_masks_drop_the_requested_percentile():
+    conf = np.arange(1, 101, dtype=np.float64).reshape(1, 10, 10)
+
+    masks = VggtEstimator._confidence_masks(conf, 50.0)
+
+    assert len(masks) == 1
+    assert masks[0].sum() == 50
+
+
+def test_confidence_masks_threshold_is_global_not_per_frame():
+    conf = np.stack([np.full((2, 2), 1.0), np.full((2, 2), 9.0)])
+
+    masks = VggtEstimator._confidence_masks(conf, 50.0)
+
+    assert not masks[0].any()
+    assert masks[1].all()
+
+
+def test_confidence_masks_keep_everything_at_zero_threshold():
+    masks = VggtEstimator._confidence_masks(np.full((2, 3, 3), 0.7), 0.0)
+
+    assert len(masks) == 2
+    assert all(mask.all() for mask in masks)
+
+
+def test_confidence_masks_always_drop_near_zero_confidence():
+    masks = VggtEstimator._confidence_masks(np.zeros((1, 2, 2)), 0.0)
+
+    assert not masks[0].any()
