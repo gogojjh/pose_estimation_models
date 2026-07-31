@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from pathlib import Path
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Tuple
 
 from estimator import BaseEstimator, WEIGHTS_DIR, THIRD_PARTY_DIR
 from estimator.utils import add_to_path, align_poses, to_numpy
@@ -64,6 +64,37 @@ class VggtEstimator(BaseEstimator):
         T[:3, 3] = -R.T @ t
         return T
 
+    @staticmethod
+    def _compute_alignment(
+        vggt_c2w_ref: List[np.ndarray], known_c2w_ref: List[np.ndarray]
+    ) -> Tuple[float, np.ndarray, np.ndarray]:
+        """Similarity transform (scale, R, t) mapping VGGT's world frame to the known one.
+
+        A single reference frame cannot constrain scale, so a rigid transform anchored on
+        that frame is returned instead.
+        """
+        if len(vggt_c2w_ref) >= 2:
+            _, (scale, rotation, translation) = align_poses(vggt_c2w_ref, known_c2w_ref)
+            return float(scale), rotation, translation
+
+        transform = known_c2w_ref[0] @ np.linalg.inv(vggt_c2w_ref[0])
+        return 1.0, transform[:3, :3], transform[:3, 3]
+
+    @staticmethod
+    def _align_pose(align: Tuple[float, np.ndarray, np.ndarray], c2w: np.ndarray) -> np.ndarray:
+        """Applies a (scale, R, t) similarity transform to a 4x4 camera-to-world pose."""
+        scale, rotation, translation = align
+        aligned = np.eye(4)
+        aligned[:3, :3] = rotation @ c2w[:3, :3]
+        aligned[:3, 3] = scale * (rotation @ c2w[:3, 3]) + translation
+        return aligned
+
+    @staticmethod
+    def _align_points(align: Tuple[float, np.ndarray, np.ndarray], pts: np.ndarray) -> np.ndarray:
+        """Applies a (scale, R, t) similarity transform to points of shape (..., 3)."""
+        scale, rotation, translation = align
+        return scale * (pts @ rotation.T) + translation
+
     def _forward(
         self,
         scene_root: Path,
@@ -109,15 +140,8 @@ class VggtEstimator(BaseEstimator):
         vggt_c2w_ref, vggt_c2w_query = vggt_c2w[:num_ref], vggt_c2w[num_ref]
         known_c2w_ref = [to_numpy(pose) for pose in list_img0_poses]
 
-        if num_ref >= 2:
-            _, (scale, R, translation) = align_poses(vggt_c2w_ref, known_c2w_ref)
-            est_im_pose = np.eye(4)
-            est_im_pose[:3, :3] = R @ vggt_c2w_query[:3, :3]
-            est_im_pose[:3, 3] = scale * (R @ vggt_c2w_query[:3, 3]) + translation
-        else:
-            # A single reference pose can't constrain scale, so compose directly and assume
-            # VGGT's own scale already matches the world scale between these two frames.
-            est_im_pose = known_c2w_ref[0] @ np.linalg.inv(vggt_c2w_ref[0]) @ vggt_c2w_query
+        align = self._compute_alignment(vggt_c2w_ref, known_c2w_ref)
+        est_im_pose = self._align_pose(align, vggt_c2w_query)
 
         est_focal = intrinsic[num_ref, 0, 0].detach()
         loss = 0.0
