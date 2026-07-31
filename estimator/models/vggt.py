@@ -205,8 +205,9 @@ class VggtEstimator(BaseEstimator):
         self.scene = None
         self._recon_state = {
             "images": to_numpy(images),                                     # (S, 3, H, W) in [0, 1]
-            # .float() mirrors the pose_enc handling above: heads run under autocast, and
-            # numpy() rejects bfloat16 outright.
+            # VGGT currently runs its heads under autocast(enabled=False), so these are
+            # already float32 and .float() is a no-op. Kept as a guard: if that ever
+            # changes, bfloat16 would reach numpy(), which rejects it outright.
             "world_points": to_numpy(predictions["world_points"][0].float()),       # (S, H, W, 3)
             "world_points_conf": to_numpy(predictions["world_points_conf"][0].float()),  # (S, H, W)
             "focals": [float(intrinsic[i, 0, 0]) for i in range(intrinsic.shape[0])],
