@@ -4,9 +4,9 @@ A unified Python API for pose estimation and image localization, wrapping six st
 
 | Model | Type | Paper |
 |-------|------|-------|
-| DUSt3R (`duster`) | Dense 3D reconstruction + pose | [CVPR 2024](https://arxiv.org/abs/2312.14132) |
-| MASt3R (`master`) | Dense matching + metric pose | [ECCV 2024](https://arxiv.org/abs/2406.09756) |
-| VGGT (`vggt`) | Feed-forward multi-view geometry | [CVPR 2025](https://arxiv.org/abs/2503.11651) |
+| DUSt3R (`duster`) | Feed-forward dense 3D reconstruction + pose (pairwise) | [CVPR 2024](https://arxiv.org/abs/2312.14132) |
+| MASt3R (`master`) | Feed-forward dense matching + metric pose (pairwise) | [ECCV 2024](https://arxiv.org/abs/2406.09756) |
+| VGGT (`vggt`) | Feed-forward multi-view geometry (joint, many views) | [CVPR 2025](https://arxiv.org/abs/2503.11651) |
 | HLoc (`hloc_*`) | Sparse feature-based localization | [CVPR 2020](https://arxiv.org/abs/1812.03506) |
 | Reloc3r (`reloc3r`) | Relative pose from dense features | [CVPR 2025](https://arxiv.org/abs/2412.08376) |
 | VPR (`vpr_*`) | Global place recognition | multiple |
@@ -60,11 +60,18 @@ print(available_models)
 
 ## VGGT
 
-VGGT differs from the other pose estimators in how it consumes input and what it returns.
+DUSt3R, MASt3R, and VGGT are all feed-forward multi-view geometry networks: each regresses dense
+pointmaps (and, for VGGT, camera poses/depth directly) in a single forward pass, with no test-time
+optimization such as bundle adjustment. They differ in how many views that forward pass covers, and
+that's what sets VGGT apart from the other estimators in how it consumes input and what it returns.
 
-**Single forward pass, no global alignment.** DUSt3R/MASt3R run pairwise inference followed by an
-iterative global-alignment optimization. VGGT predicts every camera pose, depth map, and point map for
-all input views in one feed-forward pass, which makes it roughly an order of magnitude faster.
+**Joint multi-view pass vs. pairwise + alignment.** DUSt3R and MASt3R are feed-forward but *pairwise* —
+each pass takes exactly two images and directly regresses their pointmaps, with no optimization needed
+for that pair. Reconstructing more than two views means running many such pairs and then stitching the
+results together with a separate iterative global-alignment optimization. VGGT instead is feed-forward
+across *all* input views at once: it predicts every camera pose, depth map, and point map for the full
+view set in one pass, with no pairwise stitching or alignment stage, which makes it roughly an order of
+magnitude faster on multi-view scenes.
 
 **All reference images at once.** The estimator takes the full reference list plus the query image in a
 single call, rather than one reference/query pair at a time.
