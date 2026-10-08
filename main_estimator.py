@@ -123,11 +123,10 @@ def main(args):
     estimator.verbose = True
 
     # ---- 3. Run estimation ----
-    list_img0_name = [
+    list_img0_name = args.ref_names or [
         'seq1/frame_00000.jpg',
         'seq1/frame_00001.jpg',
     ]
-    list_img0_name = list_img0_name[:]
     img1_name = 'seq0/frame_00000.jpg'
 
     list_img0_poses = []
@@ -153,6 +152,7 @@ def main(args):
         result = estimator(scene_root, list_img0_name, img1_name, list_img0_poses, list_img0_intr, img1_intr, est_opts)
         print(f"Processing time: {time.time() - start_time:.2f}s")
         print(f"Estimated pose_w2c: {result['im_pose'][:3, 3:4].T}")
+        print(f"Estimated pose_w2c full:\n{result['im_pose']}")
     except Exception as e:
         print(f"Error: {e}")
         return
@@ -168,7 +168,8 @@ def main(args):
                 print(f"Conf of {edge_str}: {conf:.3f}")
 
     try:
-        estimator.show_reconstruction(cam_size=0.3)
+        if not args.no_viz:
+            estimator.show_reconstruction(cam_size=0.3)
     except Exception as e:
         print(f"Unable to show reconstruction: {e}")
 
@@ -191,6 +192,7 @@ def parse_args():
     parser.add_argument("--max_num_keypoint", type=int, default=2048, help="maximum number of keypoints")
     parser.add_argument("--out_dir", type=Path, default=None, help="path where outputs are saved")
     parser.add_argument("--scene_root", type=Path, required=True, help="path to scene directory (contains poses.txt, intrinsics.txt, seq/)")
+    parser.add_argument("--ref_names", type=str, nargs="+", default=None, help="reference image names (default: seq1/frame_00000.jpg seq1/frame_00001.jpg)")
 
     args = parser.parse_args()
 
